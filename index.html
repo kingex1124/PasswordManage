@@ -291,11 +291,34 @@
 
     <dialog id="passwordDialog">
       <form id="passwordDialogForm" method="dialog">
-        <h2 id="passwordDialogTitle">輸入密碼</h2>
-        <p id="passwordDialogMessage" class="dialog-message"></p>
-        <div class="password-input-row">
-          <input id="passwordDialogInput" type="password" required />
-          <button id="togglePasswordDialogBtn" type="button">👁</button>
+        <div class="modal-header">
+          <h2 id="passwordDialogTitle">輸入密碼</h2>
+        </div>
+        <div class="modal-body">
+          <p id="passwordDialogMessage" class="dialog-message"></p>
+          <div class="password-input-row">
+            <input id="passwordDialogInput" type="password" />
+            <button
+              id="togglePasswordDialogBtn"
+              type="button"
+              class="icon-btn"
+              title="顯示/隱藏密碼"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </button>
+          </div>
         </div>
         <div class="modal-actions">
           <button id="cancelPasswordDialogBtn" type="button">取消</button>
