@@ -289,6 +289,21 @@
 
     <input id="fileInput" type="file" accept=".json,application/json" hidden />
 
+    <dialog id="passwordDialog">
+      <form id="passwordDialogForm" method="dialog">
+        <h2 id="passwordDialogTitle">輸入密碼</h2>
+        <p id="passwordDialogMessage" class="dialog-message"></p>
+        <div class="password-input-row">
+          <input id="passwordDialogInput" type="password" required />
+          <button id="togglePasswordDialogBtn" type="button">👁</button>
+        </div>
+        <div class="modal-actions">
+          <button id="cancelPasswordDialogBtn" type="button">取消</button>
+          <button id="confirmPasswordDialogBtn" type="submit">確認</button>
+        </div>
+      </form>
+    </dialog>
+
     <script type="module" src="./src/main.js"></script>
   </body>
 </html>

@@ -56,11 +56,66 @@ const elements = {
   fileInput: document.querySelector("#fileInput"),
   categoryMasterBody: document.querySelector("#categoryMasterBody"),
   typeMasterBody: document.querySelector("#typeMasterBody"),
+  passwordDialog: document.querySelector("#passwordDialog"),
+  passwordDialogForm: document.querySelector("#passwordDialogForm"),
+  passwordDialogTitle: document.querySelector("#passwordDialogTitle"),
+  passwordDialogMessage: document.querySelector("#passwordDialogMessage"),
+  passwordDialogInput: document.querySelector("#passwordDialogInput"),
+  togglePasswordDialogBtn: document.querySelector("#togglePasswordDialogBtn"),
+  cancelPasswordDialogBtn: document.querySelector("#cancelPasswordDialogBtn"),
 };
 
 function setMessage(message, messageType = "") {
   elements.messageArea.textContent = message;
   elements.messageArea.className = `message ${messageType}`.trim();
+}
+
+function askPassword({ title, message, defaultValue = "" }) {
+  return new Promise((resolve) => {
+    elements.passwordDialogTitle.textContent = title;
+    elements.passwordDialogMessage.textContent = message;
+    elements.passwordDialogInput.value = defaultValue;
+    elements.passwordDialogInput.type = "password";
+    elements.togglePasswordDialogBtn.textContent = "👁";
+
+    const cleanup = () => {
+      elements.passwordDialogForm.removeEventListener("submit", onSubmit);
+      elements.cancelPasswordDialogBtn.removeEventListener("click", onCancel);
+      elements.togglePasswordDialogBtn.removeEventListener("click", onToggle);
+      elements.passwordDialog.removeEventListener("cancel", onCancel);
+    };
+
+    const onSubmit = (event) => {
+      event.preventDefault();
+      const value = elements.passwordDialogInput.value;
+      cleanup();
+      elements.passwordDialog.close();
+      resolve(value);
+    };
+
+    const onCancel = () => {
+      cleanup();
+      if (elements.passwordDialog.open) {
+        elements.passwordDialog.close();
+      }
+      resolve(null);
+    };
+
+    const onToggle = () => {
+      const isHidden = elements.passwordDialogInput.type === "password";
+      elements.passwordDialogInput.type = isHidden ? "text" : "password";
+      elements.togglePasswordDialogBtn.textContent = isHidden ? "🙈" : "👁";
+    };
+
+    elements.passwordDialogForm.addEventListener("submit", onSubmit);
+    elements.cancelPasswordDialogBtn.addEventListener("click", onCancel);
+    elements.togglePasswordDialogBtn.addEventListener("click", onToggle);
+    elements.passwordDialog.addEventListener("cancel", onCancel);
+
+    elements.passwordDialog.showModal();
+    elements.passwordDialogInput.focus();
+    elements.passwordDialogInput.select();
+  });
 }
 
 function getVisibilityKey(recordId, historyId) {
@@ -536,7 +591,11 @@ async function handleImport(encryptedText, fileHandle = null) {
     throw new Error("INVALID_FILE");
   }
 
-  const inputPassword = window.prompt("請輸入存檔密碼");
+  const inputPassword = await askPassword({
+    title: "匯入加密檔",
+    message: "請輸入存檔密碼",
+    defaultValue: "",
+  });
   if (inputPassword === null) {
     return;
   }
@@ -593,10 +652,11 @@ async function handleImportClick() {
 
 async function handleExportClick() {
   try {
-    const inputPassword = window.prompt(
-      "請輸入存檔密碼（可留空為目前密碼）",
-      state.archivePassword || "",
-    );
+    const inputPassword = await askPassword({
+      title: "存檔",
+      message: "請輸入存檔密碼（可留空為目前密碼）",
+      defaultValue: state.archivePassword || "",
+    });
     if (inputPassword === null) {
       return;
     }
@@ -672,11 +732,12 @@ function bindEvents() {
     elements.saveBtn.addEventListener("click", handleExportClick);
   }
 
-  elements.changeArchivePasswordBtn.addEventListener("click", () => {
-    const newPassword = window.prompt(
-      "請輸入新的存檔密碼",
-      state.archivePassword || "",
-    );
+  elements.changeArchivePasswordBtn.addEventListener("click", async () => {
+    const newPassword = await askPassword({
+      title: "變更存檔密碼",
+      message: "請輸入新的存檔密碼",
+      defaultValue: state.archivePassword || "",
+    });
     if (newPassword === null) {
       return;
     }
