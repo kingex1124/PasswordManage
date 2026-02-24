@@ -3,128 +3,282 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#2563eb" />
+    <meta name="theme-color" content="#ffffff" />
     <title>密碼管理</title>
     <link rel="manifest" href="./manifest.json" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <header class="toolbar">
-      <h1>密碼管理</h1>
-      <div class="toolbar-actions">
-        <button id="addRecordBtn" type="button">新增資料</button>
-        <button id="importBtn" type="button">匯入加密檔</button>
-        <button id="saveBtn" type="button">存檔</button>
-        <button id="changeArchivePasswordBtn" type="button">變更存檔密碼</button>
-      </div>
-    </header>
-
-    <section class="filters">
-      <label>
-        類別篩選
-        <select id="categoryFilter" multiple></select>
-      </label>
-      <label>
-        種類篩選
-        <select id="typeFilter" multiple></select>
-      </label>
-      <label>
-        帳號關鍵字
-        <input id="accountKeyword" type="text" placeholder="輸入帳號關鍵字" />
-      </label>
-      <label>
-        排序方式
-        <select id="sortMode">
-          <option value="default">預設（類別/種類/帳號/更新時間）</option>
-          <option value="updatedDesc">最近更新時間（新→舊）</option>
-          <option value="updatedAsc">最近更新時間（舊→新）</option>
-          <option value="accountAsc">帳號（A→Z）</option>
-        </select>
-      </label>
-    </section>
-
-    <section id="messageArea" class="message" aria-live="polite"></section>
-
-    <main>
-      <section class="master-section">
-        <div class="master-block">
-          <div class="master-head">
-            <h2>類別維護</h2>
-            <button id="addCategoryBtn" type="button">新增類別</button>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>流水號</th>
-                <th>名稱</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody id="categoryMasterBody"></tbody>
-          </table>
+    <div class="app-container">
+      <header class="toolbar">
+        <h1>
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+          密碼管理
+        </h1>
+        <div class="toolbar-actions">
+          <button id="addRecordBtn" type="button">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            新增資料
+          </button>
+          <button id="importBtn" type="button">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            匯入加密檔
+          </button>
+          <button id="saveBtn" type="button">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"
+              ></path>
+              <polyline points="17 21 17 13 7 13 7 21"></polyline>
+              <polyline points="7 3 7 8 15 8"></polyline>
+            </svg>
+            存檔
+          </button>
+          <button id="changeArchivePasswordBtn" type="button">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"
+              ></path>
+            </svg>
+            變更存檔密碼
+          </button>
         </div>
+      </header>
 
-        <div class="master-block">
-          <div class="master-head">
-            <h2>種類維護</h2>
-            <button id="addTypeBtn" type="button">新增種類</button>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>流水號</th>
-                <th>名稱</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody id="typeMasterBody"></tbody>
-          </table>
-        </div>
+      <section class="card filters">
+        <label>
+          類別篩選
+          <select id="categoryFilter" multiple></select>
+        </label>
+        <label>
+          種類篩選
+          <select id="typeFilter" multiple></select>
+        </label>
+        <label>
+          帳號關鍵字
+          <input id="accountKeyword" type="text" placeholder="輸入帳號關鍵字" />
+        </label>
+        <label>
+          排序方式
+          <select id="sortMode">
+            <option value="default">預設（類別/種類/帳號/更新時間）</option>
+            <option value="updatedDesc">最近更新時間（新→舊）</option>
+            <option value="updatedAsc">最近更新時間（舊→新）</option>
+            <option value="accountAsc">帳號（A→Z）</option>
+          </select>
+        </label>
       </section>
 
-      <table>
-        <thead>
-          <tr>
-            <th>類別</th>
-            <th>種類</th>
-            <th>帳號</th>
-            <th>密碼歷程</th>
-            <th>備註</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody id="recordTableBody"></tbody>
-      </table>
-    </main>
+      <section id="messageArea" class="message" aria-live="polite"></section>
+
+      <main>
+        <section class="master-section">
+          <div class="master-block">
+            <div class="master-head">
+              <h2>類別維護</h2>
+              <button
+                id="addCategoryBtn"
+                type="button"
+                class="icon-btn"
+                title="新增類別"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+              </button>
+            </div>
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width: 80px">流水號</th>
+                    <th>名稱</th>
+                    <th style="width: 120px">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="categoryMasterBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="master-block">
+            <div class="master-head">
+              <h2>種類維護</h2>
+              <button
+                id="addTypeBtn"
+                type="button"
+                class="icon-btn"
+                title="新增種類"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+              </button>
+            </div>
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width: 80px">流水號</th>
+                    <th>名稱</th>
+                    <th style="width: 120px">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="typeMasterBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>類別</th>
+                <th>種類</th>
+                <th>帳號</th>
+                <th>密碼歷程</th>
+                <th>備註</th>
+                <th style="width: 120px">操作</th>
+              </tr>
+            </thead>
+            <tbody id="recordTableBody"></tbody>
+          </table>
+        </div>
+      </main>
+    </div>
 
     <dialog id="recordModal">
       <form id="recordForm" method="dialog">
-        <h2 id="recordModalTitle">新增資料</h2>
-        <input id="recordId" type="hidden" />
-
-        <label>
-          類別
-          <select id="categoryInput" required></select>
-        </label>
-        <label>
-          種類
-          <select id="typeInput" required></select>
-        </label>
-        <label>
-          帳號
-          <input id="accountInput" type="text" required />
-        </label>
-
-        <div class="history-head">
-          <span>密碼歷程</span>
-          <button id="addPasswordHistoryBtn" type="button">新增密碼歷程</button>
+        <div class="modal-header">
+          <h2 id="recordModalTitle">新增資料</h2>
         </div>
-        <div id="passwordHistoryEditor" class="history-editor"></div>
+        <div class="modal-body">
+          <input id="recordId" type="hidden" />
 
-        <label>
-          備註
-          <textarea id="noteInput" rows="4"></textarea>
-        </label>
+          <div class="flex-row">
+            <label>
+              類別
+              <select id="categoryInput" required></select>
+            </label>
+            <label>
+              種類
+              <select id="typeInput" required></select>
+            </label>
+          </div>
+          <label>
+            帳號
+            <input id="accountInput" type="text" required />
+          </label>
+
+          <div>
+            <div class="history-head">
+              <span>密碼歷程</span>
+              <button
+                id="addPasswordHistoryBtn"
+                type="button"
+                class="icon-btn"
+                title="新增密碼歷程"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                新增
+              </button>
+            </div>
+            <div id="passwordHistoryEditor" class="history-editor"></div>
+          </div>
+
+          <label>
+            備註
+            <textarea id="noteInput" rows="4"></textarea>
+          </label>
+        </div>
 
         <div class="modal-actions">
           <button id="cancelModalBtn" type="button">取消</button>
