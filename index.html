@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#2563eb" />
+    <title>密碼管理</title>
+    <link rel="manifest" href="./manifest.json" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="toolbar">
+      <h1>密碼管理</h1>
+      <div class="toolbar-actions">
+        <button id="addRecordBtn" type="button">新增資料</button>
+        <button id="importBtn" type="button">匯入加密檔</button>
+        <button id="saveBtn" type="button">存檔</button>
+        <button id="changeArchivePasswordBtn" type="button">變更存檔密碼</button>
+      </div>
+    </header>
+
+    <section class="filters">
+      <label>
+        類別篩選
+        <select id="categoryFilter" multiple></select>
+      </label>
+      <label>
+        種類篩選
+        <select id="typeFilter" multiple></select>
+      </label>
+      <label>
+        帳號關鍵字
+        <input id="accountKeyword" type="text" placeholder="輸入帳號關鍵字" />
+      </label>
+      <label>
+        排序方式
+        <select id="sortMode">
+          <option value="default">預設（類別/種類/帳號/更新時間）</option>
+          <option value="updatedDesc">最近更新時間（新→舊）</option>
+          <option value="updatedAsc">最近更新時間（舊→新）</option>
+          <option value="accountAsc">帳號（A→Z）</option>
+        </select>
+      </label>
+    </section>
+
+    <section id="messageArea" class="message" aria-live="polite"></section>
+
+    <main>
+      <section class="master-section">
+        <div class="master-block">
+          <div class="master-head">
+            <h2>類別維護</h2>
+            <button id="addCategoryBtn" type="button">新增類別</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>流水號</th>
+                <th>名稱</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="categoryMasterBody"></tbody>
+          </table>
+        </div>
+
+        <div class="master-block">
+          <div class="master-head">
+            <h2>種類維護</h2>
+            <button id="addTypeBtn" type="button">新增種類</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>流水號</th>
+                <th>名稱</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="typeMasterBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <table>
+        <thead>
+          <tr>
+            <th>類別</th>
+            <th>種類</th>
+            <th>帳號</th>
+            <th>密碼歷程</th>
+            <th>備註</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="recordTableBody"></tbody>
+      </table>
+    </main>
+
+    <dialog id="recordModal">
+      <form id="recordForm" method="dialog">
+        <h2 id="recordModalTitle">新增資料</h2>
+        <input id="recordId" type="hidden" />
+
+        <label>
+          類別
+          <select id="categoryInput" required></select>
+        </label>
+        <label>
+          種類
+          <select id="typeInput" required></select>
+        </label>
+        <label>
+          帳號
+          <input id="accountInput" type="text" required />
+        </label>
+
+        <div class="history-head">
+          <span>密碼歷程</span>
+          <button id="addPasswordHistoryBtn" type="button">新增密碼歷程</button>
+        </div>
+        <div id="passwordHistoryEditor" class="history-editor"></div>
+
+        <label>
+          備註
+          <textarea id="noteInput" rows="4"></textarea>
+        </label>
+
+        <div class="modal-actions">
+          <button id="cancelModalBtn" type="button">取消</button>
+          <button id="saveRecordBtn" type="submit">儲存</button>
+        </div>
+      </form>
+    </dialog>
+
+    <input id="fileInput" type="file" accept=".json,application/json" hidden />
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

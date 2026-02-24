@@ -1,0 +1,189 @@
+:root {
+  color-scheme: light;
+  font-family: "Segoe UI", "Noto Sans TC", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 16px;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filters {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin-bottom: 16px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+select[multiple] {
+  min-height: 96px;
+}
+
+.message {
+  min-height: 24px;
+  margin-bottom: 8px;
+  font-size: 0.95rem;
+}
+
+.message.error {
+  color: #b91c1c;
+}
+
+.message.success {
+  color: #166534;
+}
+
+.master-section {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.master-block {
+  background: #ffffff;
+}
+
+.master-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px;
+}
+
+.master-head h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #ffffff;
+}
+
+th,
+td {
+  border: 1px solid #cbd5e1;
+  padding: 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  background: #e2e8f0;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.history-item,
+.history-edit-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.history-item time {
+  font-size: 0.85rem;
+  color: #334155;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+dialog {
+  width: min(880px, 95vw);
+  border: none;
+  border-radius: 8px;
+  padding: 0;
+}
+
+dialog::backdrop {
+  background: rgba(15, 23, 42, 0.55);
+}
+
+#recordForm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+}
+
+.history-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.history-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history-edit-item {
+  grid-template-columns: 1fr 220px auto;
+}
+
+.history-edit-item > input[type="password"],
+.history-edit-item > input[type="text"] {
+  width: 100%;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.empty-state {
+  text-align: center;
+  color: #475569;
+}
