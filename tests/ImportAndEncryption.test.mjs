@@ -37,9 +37,52 @@ test('EncryptionService should encrypt and decrypt records', async () => {
   assert.equal(encrypted.formatVersion, '3.0.0');
   assert.equal(encrypted.algorithm.cipher, 'AES-256-GCM');
   assert.equal(encrypted.algorithm.iterations, 600000);
+  assert.equal(encrypted.algorithm.kdfParams.iterations, 600000);
+  assert.equal(encrypted.algorithm.kdfParams.saltLengthBytes, 16);
 
   const decrypted = await service.decryptFilePayload(encrypted, 'archive-pass');
   assert.deepEqual(decrypted, plainData);
+});
+
+test('EncryptionService should support configurable KDF params on encrypt', async () => {
+  const service = new EncryptionService();
+  const plainData = {
+    version: '1.1.0',
+    records: [],
+  };
+
+  const encrypted = await service.encryptRecords(plainData, 'archive-pass', {
+    kdfParams: {
+      iterations: 750000,
+      keyLengthBytes: 32,
+      saltLengthBytes: 24,
+    },
+  });
+
+  assert.equal(encrypted.algorithm.iterations, 750000);
+  assert.equal(encrypted.algorithm.kdfParams.iterations, 750000);
+  assert.equal(encrypted.algorithm.kdfParams.keyLengthBytes, 32);
+  assert.equal(encrypted.algorithm.kdfParams.saltLengthBytes, 24);
+
+  const decrypted = await service.decryptFilePayload(encrypted, 'archive-pass');
+  assert.deepEqual(decrypted, plainData);
+});
+
+test('EncryptionService should reject unsupported KDF params from payload', async () => {
+  const service = new EncryptionService();
+  const plainData = {
+    version: '1.1.0',
+    records: [],
+  };
+
+  const encrypted = await service.encryptRecords(plainData, 'archive-pass');
+  encrypted.algorithm.kdfParams.iterations = 3000000;
+  encrypted.algorithm.iterations = 3000000;
+
+  await assert.rejects(
+    () => service.decryptFilePayload(encrypted, 'archive-pass'),
+    /UNSUPPORTED_KDF_PARAMS/,
+  );
 });
 
 test('EncryptionService should block legacy AES-CBC payload by default', async () => {

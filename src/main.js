@@ -1083,6 +1083,10 @@ async function handleImport(encryptedText, fileHandle = null) {
       setMessage("匯入失敗：不支援的檔案版本", "error");
       return;
     }
+    if (error.message === "UNSUPPORTED_KDF_PARAMS") {
+      setMessage("匯入失敗：檔案 KDF 參數不受支援", "error");
+      return;
+    }
     if (error.message === "LEGACY_CIPHER_DISABLED") {
       const shouldUpgrade = window.confirm(
         "偵測到舊版 CBC 檔案。是否立即升級為新版加密格式並載入？",

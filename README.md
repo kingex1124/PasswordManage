@@ -17,6 +17,38 @@
 npm test
 ```
 
+## 部署安全標頭
+
+此專案已提供部署端安全標頭範本：
+
+- Netlify / Cloudflare Pages：`_headers`
+- Vercel：`vercel.json`
+
+重點：`frame-ancestors 'none'` 必須由 HTTP 回應標頭下發，不能只放在 HTML `<meta>` 中。
+
+## KDF 成本參數（可調）
+
+目前加密使用 PBKDF2，支援每次匯出時調整 KDF 成本參數（會寫入匯出檔 `algorithm.kdfParams`）：
+
+- `iterations`：`100000` ~ `2000000`
+- `keyLengthBytes`：`16 | 24 | 32`
+- `saltLengthBytes`：`16` ~ `32`
+
+範例：
+
+```js
+const service = new EncryptionService();
+const encrypted = await service.encryptRecords(data, archivePassword, {
+	kdfParams: {
+		iterations: 750000,
+		keyLengthBytes: 32,
+		saltLengthBytes: 24,
+	},
+});
+```
+
+若匯入檔案包含超出支援範圍的 KDF 參數，系統會拒絕解密並顯示錯誤。
+
 ## 功能對照
 
 - 新增/編輯/刪除帳密資料（Modal）

@@ -2,27 +2,39 @@ import { CryptoInitializer, Pbkdf2Strategy } from '../../crypto-js-lib/src/index
 import { base64ToBytes } from '../utils.js';
 
 const LEGACY_ITERATIONS = 100000;
-const ITERATIONS = 600000;
-const KEY_LENGTH_BYTES = 32;
+const DEFAULT_KDF_PARAMS = {
+  iterations: 600000,
+  keyLengthBytes: 32,
+  saltLengthBytes: 16,
+};
+const KDF_BOUNDS = {
+  minIterations: 100000,
+  maxIterations: 2000000,
+  minSaltLengthBytes: 16,
+  maxSaltLengthBytes: 32,
+};
+const SUPPORTED_KEY_LENGTHS = new Set([16, 24, 32]);
 const CURRENT_FORMAT_VERSION = '3.0.0';
 const CIPHER_AES_256_GCM = 'AES-256-GCM';
 const CIPHER_AES_256_CBC = 'AES-256-CBC';
 
 export class EncryptionService {
-  constructor() {
+  constructor(options = {}) {
     this.kdfStrategy = new Pbkdf2Strategy();
+    this.kdfDefaults = this.resolveKdfDefaults(options.kdfDefaults);
   }
 
-  async encryptRecords(plainData, archivePassword) {
+  async encryptRecords(plainData, archivePassword, options = {}) {
     const plainText = JSON.stringify(plainData);
-    const { base64Salt, bytesSalt } = CryptoInitializer.generateSalt(16);
+    const kdfParams = this.resolveKdfParamsForEncrypt(options.kdfParams);
+    const { base64Salt, bytesSalt } = CryptoInitializer.generateSalt(kdfParams.saltLengthBytes);
 
     const derivedKey = await CryptoInitializer.deriveKeyFromPassword(
       archivePassword,
       bytesSalt,
       this.kdfStrategy,
-      ITERATIONS,
-      KEY_LENGTH_BYTES,
+      kdfParams.iterations,
+      kdfParams.keyLengthBytes,
     );
 
     const encrypted = await this.encryptWithAesGcm(plainText, derivedKey);
@@ -31,8 +43,9 @@ export class EncryptionService {
       formatVersion: CURRENT_FORMAT_VERSION,
       algorithm: {
         kdf: 'PBKDF2',
-        iterations: ITERATIONS,
-        keyLengthBytes: KEY_LENGTH_BYTES,
+        iterations: kdfParams.iterations,
+        keyLengthBytes: kdfParams.keyLengthBytes,
+        kdfParams,
         hash: 'SHA-256',
         cipher: CIPHER_AES_256_GCM,
         ivEncoding: 'base64',
@@ -86,23 +99,123 @@ export class EncryptionService {
   }
 
   resolveIterations(encryptedPayload) {
-    const candidate = Number(encryptedPayload?.algorithm?.iterations);
+    const candidate = Number(
+      encryptedPayload?.algorithm?.kdfParams?.iterations
+      ?? encryptedPayload?.algorithm?.iterations,
+    );
     if (!Number.isFinite(candidate) || candidate <= 0) {
       const version = String(encryptedPayload?.formatVersion || encryptedPayload?.version || '');
       if (version.startsWith('1.') || version.startsWith('2.')) {
         return LEGACY_ITERATIONS;
       }
-      return ITERATIONS;
+      return this.kdfDefaults.iterations;
     }
-    return Math.floor(candidate);
+
+    const normalized = Math.floor(candidate);
+    if (normalized < KDF_BOUNDS.minIterations || normalized > KDF_BOUNDS.maxIterations) {
+      throw new Error('UNSUPPORTED_KDF_PARAMS');
+    }
+    return normalized;
   }
 
   resolveKeyLengthBytes(encryptedPayload) {
-    const candidate = Number(encryptedPayload?.algorithm?.keyLengthBytes);
+    const candidate = Number(
+      encryptedPayload?.algorithm?.kdfParams?.keyLengthBytes
+      ?? encryptedPayload?.algorithm?.keyLengthBytes,
+    );
     if (!Number.isFinite(candidate) || candidate <= 0) {
-      return KEY_LENGTH_BYTES;
+      return this.kdfDefaults.keyLengthBytes;
     }
-    return Math.floor(candidate);
+
+    const normalized = Math.floor(candidate);
+    if (!SUPPORTED_KEY_LENGTHS.has(normalized)) {
+      throw new Error('UNSUPPORTED_KDF_PARAMS');
+    }
+    return normalized;
+  }
+
+  resolveKdfDefaults(input = {}) {
+    const iterations = this.normalizeInteger(
+      input?.iterations,
+      DEFAULT_KDF_PARAMS.iterations,
+      KDF_BOUNDS.minIterations,
+      KDF_BOUNDS.maxIterations,
+    );
+
+    const keyLengthBytes = this.normalizeKeyLength(
+      input?.keyLengthBytes,
+      DEFAULT_KDF_PARAMS.keyLengthBytes,
+    );
+
+    const saltLengthBytes = this.normalizeInteger(
+      input?.saltLengthBytes,
+      DEFAULT_KDF_PARAMS.saltLengthBytes,
+      KDF_BOUNDS.minSaltLengthBytes,
+      KDF_BOUNDS.maxSaltLengthBytes,
+    );
+
+    return {
+      iterations,
+      keyLengthBytes,
+      saltLengthBytes,
+    };
+  }
+
+  resolveKdfParamsForEncrypt(input = {}) {
+    return {
+      iterations: this.normalizeInteger(
+        input?.iterations,
+        this.kdfDefaults.iterations,
+        KDF_BOUNDS.minIterations,
+        KDF_BOUNDS.maxIterations,
+      ),
+      keyLengthBytes: this.normalizeKeyLength(
+        input?.keyLengthBytes,
+        this.kdfDefaults.keyLengthBytes,
+      ),
+      saltLengthBytes: this.normalizeInteger(
+        input?.saltLengthBytes,
+        this.kdfDefaults.saltLengthBytes,
+        KDF_BOUNDS.minSaltLengthBytes,
+        KDF_BOUNDS.maxSaltLengthBytes,
+      ),
+    };
+  }
+
+  normalizeInteger(value, fallback, min, max) {
+    if (value === undefined || value === null) {
+      return fallback;
+    }
+
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      throw new Error('UNSUPPORTED_KDF_PARAMS');
+    }
+
+    const normalized = Math.floor(numeric);
+    if (normalized < min || normalized > max) {
+      throw new Error('UNSUPPORTED_KDF_PARAMS');
+    }
+
+    return normalized;
+  }
+
+  normalizeKeyLength(value, fallback) {
+    if (value === undefined || value === null) {
+      return fallback;
+    }
+
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      throw new Error('UNSUPPORTED_KDF_PARAMS');
+    }
+
+    const normalized = Math.floor(numeric);
+    if (!SUPPORTED_KEY_LENGTHS.has(normalized)) {
+      throw new Error('UNSUPPORTED_KDF_PARAMS');
+    }
+
+    return normalized;
   }
 
   resolveCipherName(encryptedPayload) {
