@@ -695,6 +695,9 @@ function updateFilterOptions() {
 }
 
 function updateTableSortHeaderUI() {
+  if (!elements.categorySortHeader || !elements.typeSortHeader) {
+    return;
+  }
   const categoryArrow = state.tableSort.column === "category"
     ? (state.tableSort.direction === "asc" ? " ▲" : " ▼")
     : "";
@@ -1016,13 +1019,17 @@ async function handleExportClick() {
 }
 
 function bindEvents() {
-  elements.categorySortHeader.addEventListener("click", () => {
-    toggleTableSort("category");
-  });
+  if (elements.categorySortHeader) {
+    elements.categorySortHeader.addEventListener("click", () => {
+      toggleTableSort("category");
+    });
+  }
 
-  elements.typeSortHeader.addEventListener("click", () => {
-    toggleTableSort("type");
-  });
+  if (elements.typeSortHeader) {
+    elements.typeSortHeader.addEventListener("click", () => {
+      toggleTableSort("type");
+    });
+  }
 
   elements.toggleMasterBtn.addEventListener("click", () => {
     elements.masterPanelBody.classList.toggle("is-collapsed");
