@@ -298,17 +298,52 @@ select[multiple] {
   margin: 0;
 }
 
+/* Master Panel & Section */
+
+.master-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 1rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.master-panel-head h2 {
+  font-size: 1.125rem;
+  color: var(--text-main);
+  margin: 0;
+}
+
+#masterPanelBody {
+  transition: all var(--transition-normal);
+  /* overflow: hidden; causes issue with box-shadow sometimes but fine here */
+}
+
 #masterPanelBody.is-collapsed {
   display: none;
 }
 
+#toggleMasterBtn {
+  font-size: 0.8rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  background: white;
+}
+
+#toggleMasterBtn:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+
 .master-section {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-  gap: 2rem;
-  margin-bottom: 0;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 1.5rem;
   align-items: start;
-  padding: 1.25rem;
 }
 
 .master-block {
@@ -319,30 +354,68 @@ select[multiple] {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  transition: box-shadow var(--transition-fast);
+}
+
+.master-block:hover {
+  /* Subtle lift on hover */
+  box-shadow: var(--shadow-md);
+  border-color: var(--text-light);
 }
 
 .master-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 1.5rem;
+  padding: 0.875rem 1.25rem;
   background-color: var(--bg-subtle);
   border-bottom: 1px solid var(--border);
 }
 
 .master-head h2 {
-  font-size: 1.125rem;
-  color: var(--text-main);
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+  margin: 0;
 }
 
 .master-hint {
-  color: var(--text-muted);
+  color: #0369a1; /* Sky 700 */
   font-size: 0.85rem;
-  padding: 0 1.5rem 0.75rem;
+  background-color: #f0f9ff; /* Sky 50 */
+  padding: 0.625rem 1.25rem;
+  border-bottom: 1px solid #e0f2fe; /* Sky 100 */
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
+.master-hint:empty {
+  display: none;
+}
+
+/* Selected row style */
 .master-row-selected {
-  background-color: var(--primary-light);
+  position: relative;
+}
+
+.master-row-selected td {
+  background-color: var(--primary-light) !important;
+  color: var(--primary-hover);
+  font-weight: 500;
+}
+
+.master-row-selected td:first-child::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background-color: var(--primary);
 }
 
 /* Tables */
@@ -722,5 +795,31 @@ dialog[open] {
   background-color: var(--primary);
   color: white;
   border-color: transparent;
+}
+
+
+/* Filters Optimization */
+select[multiple] {
+  min-height: 100px; /* SLightly reduces height from 130px */
+  border-color: var(--border);
+  background-color: #ffffff;
+}
+
+/* Password History List Item Polish */
+.history-item {
+  justify-content: space-between; /* Better spacing */
+  padding: 0.35rem 0.75rem;
+}
+
+.history-item time {
+  margin: 0 0.5rem; /* Add breathing room around date */
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
+/* Master Panel Table adjustments */
+.master-block .table-container {
+  max-height: 300px; /* Add max-height to prevent endless scrolling if list is long */
+  overflow-y: auto;
 }
 
