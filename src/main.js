@@ -42,6 +42,8 @@ const elements = {
   accountKeyword: document.querySelector("#accountKeyword"),
   sortMode: document.querySelector("#sortMode"),
   messageArea: document.querySelector("#messageArea"),
+  messageText: document.querySelector("#messageText"),
+  messageCloseBtn: document.querySelector("#messageCloseBtn"),
   recordTableBody: document.querySelector("#recordTableBody"),
   recordModal: document.querySelector("#recordModal"),
   recordModalTitle: document.querySelector("#recordModalTitle"),
@@ -71,8 +73,17 @@ const elements = {
 };
 
 function setMessage(message, messageType = "") {
-  elements.messageArea.textContent = message;
+  elements.messageText.textContent = message;
   elements.messageArea.className = `message ${messageType}`.trim();
+  if (message) {
+    elements.messageArea.classList.add("is-visible");
+  } else {
+    elements.messageArea.classList.remove("is-visible");
+  }
+}
+
+function clearMessage() {
+  setMessage("");
 }
 
 function askPassword({ title, message, defaultValue = "" }) {
@@ -923,6 +934,10 @@ function bindEvents() {
   elements.sortMode.addEventListener("change", () => {
     state.filters.sortMode = elements.sortMode.value;
     renderRecords();
+  });
+
+  elements.messageCloseBtn.addEventListener("click", () => {
+    clearMessage();
   });
 
   elements.fileInput.addEventListener("change", async () => {
