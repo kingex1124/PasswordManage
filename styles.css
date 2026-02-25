@@ -459,6 +459,14 @@ th {
   white-space: nowrap;
 }
 
+.th-col-seq {
+  width: 80px;
+}
+
+.th-col-actions {
+  width: 120px;
+}
+
 .sortable-header {
   cursor: pointer;
   user-select: none;

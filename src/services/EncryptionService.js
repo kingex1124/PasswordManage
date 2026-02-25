@@ -3,6 +3,9 @@ import { base64ToBytes } from '../utils.js';
 
 const ITERATIONS = 100000;
 const KEY_LENGTH_BYTES = 32;
+const CURRENT_FORMAT_VERSION = '2.0.0';
+const CIPHER_AES_256_GCM = 'AES-256-GCM';
+const CIPHER_AES_256_CBC = 'AES-256-CBC';
 
 export class EncryptionService {
   constructor() {
@@ -21,21 +24,16 @@ export class EncryptionService {
       KEY_LENGTH_BYTES,
     );
 
-    const aesContext = CryptoInitializer.getAesContextForEncryptByRandomIV();
-    aesContext.key = derivedKey;
-    const encrypted = await aesContext.encryptWithIVToBase64(plainText);
-
-    if (!encrypted.success || !encrypted.cipherText || !encrypted.iv) {
-      throw new Error('ENCRYPT_FAILED');
-    }
+    const encrypted = await this.encryptWithAesGcm(plainText, derivedKey);
 
     return {
-      formatVersion: '1.1.0',
+      formatVersion: CURRENT_FORMAT_VERSION,
       algorithm: {
         kdf: 'PBKDF2',
         iterations: ITERATIONS,
         keyLengthBytes: KEY_LENGTH_BYTES,
-        cipher: 'AES-256-CBC',
+        hash: 'SHA-256',
+        cipher: CIPHER_AES_256_GCM,
         ivEncoding: 'base64',
         saltEncoding: 'base64',
         cipherTextEncoding: 'base64',
@@ -51,23 +49,138 @@ export class EncryptionService {
     this.validateEncryptedPayload(encryptedPayload);
 
     const bytesSalt = base64ToBytes(encryptedPayload.salt);
+    const iterations = this.resolveIterations(encryptedPayload);
+    const keyLengthBytes = this.resolveKeyLengthBytes(encryptedPayload);
     const derivedKey = await CryptoInitializer.deriveKeyFromPassword(
       archivePassword,
       bytesSalt,
       this.kdfStrategy,
-      ITERATIONS,
-      KEY_LENGTH_BYTES,
+      iterations,
+      keyLengthBytes,
     );
 
+    const cipherName = this.resolveCipherName(encryptedPayload);
+
+    let plainText;
+    if (cipherName === CIPHER_AES_256_GCM) {
+      plainText = await this.decryptWithAesGcm(encryptedPayload, derivedKey);
+    } else if (cipherName === CIPHER_AES_256_CBC) {
+      plainText = await this.decryptWithAesCbc(encryptedPayload, derivedKey);
+    } else {
+      throw new Error('UNSUPPORTED_VERSION');
+    }
+
+    const plainData = JSON.parse(plainText);
+    return plainData;
+  }
+
+  resolveIterations(encryptedPayload) {
+    const candidate = Number(encryptedPayload?.algorithm?.iterations);
+    if (!Number.isFinite(candidate) || candidate <= 0) {
+      return ITERATIONS;
+    }
+    return Math.floor(candidate);
+  }
+
+  resolveKeyLengthBytes(encryptedPayload) {
+    const candidate = Number(encryptedPayload?.algorithm?.keyLengthBytes);
+    if (!Number.isFinite(candidate) || candidate <= 0) {
+      return KEY_LENGTH_BYTES;
+    }
+    return Math.floor(candidate);
+  }
+
+  resolveCipherName(encryptedPayload) {
+    const cipherName = String(encryptedPayload?.algorithm?.cipher || '').toUpperCase();
+    if (cipherName === CIPHER_AES_256_GCM) {
+      return CIPHER_AES_256_GCM;
+    }
+    if (cipherName === CIPHER_AES_256_CBC) {
+      return CIPHER_AES_256_CBC;
+    }
+
+    const version = String(encryptedPayload?.formatVersion || encryptedPayload?.version || '');
+    if (version.startsWith('2.')) {
+      return CIPHER_AES_256_GCM;
+    }
+    return CIPHER_AES_256_CBC;
+  }
+
+  async encryptWithAesGcm(plainText, derivedKey) {
+    try {
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const cryptoKey = await crypto.subtle.importKey(
+        'raw',
+        derivedKey,
+        { name: 'AES-GCM' },
+        false,
+        ['encrypt'],
+      );
+
+      const encoder = new TextEncoder();
+      const plainBytes = encoder.encode(plainText);
+      const cipherBuffer = await crypto.subtle.encrypt(
+        {
+          name: 'AES-GCM',
+          iv,
+        },
+        cryptoKey,
+        plainBytes,
+      );
+
+      return {
+        iv: this.bytesToBase64(iv),
+        cipherText: this.bytesToBase64(new Uint8Array(cipherBuffer)),
+      };
+    } catch {
+      throw new Error('ENCRYPT_FAILED');
+    }
+  }
+
+  async decryptWithAesGcm(encryptedPayload, derivedKey) {
+    try {
+      const iv = base64ToBytes(encryptedPayload.iv);
+      const cipherBytes = base64ToBytes(encryptedPayload.cipherText);
+      const cryptoKey = await crypto.subtle.importKey(
+        'raw',
+        derivedKey,
+        { name: 'AES-GCM' },
+        false,
+        ['decrypt'],
+      );
+
+      const plainBuffer = await crypto.subtle.decrypt(
+        {
+          name: 'AES-GCM',
+          iv,
+        },
+        cryptoKey,
+        cipherBytes,
+      );
+
+      const decoder = new TextDecoder();
+      return decoder.decode(plainBuffer);
+    } catch {
+      throw new Error('DECRYPT_FAILED');
+    }
+  }
+
+  async decryptWithAesCbc(encryptedPayload, derivedKey) {
     const aesContext = CryptoInitializer.getAesContextForDecryptByRandomIV(encryptedPayload.iv);
     aesContext.key = derivedKey;
     const decrypted = await aesContext.decryptFromBase64(encryptedPayload.cipherText);
     if (!decrypted.success || typeof decrypted.data !== 'string') {
       throw new Error('DECRYPT_FAILED');
     }
+    return decrypted.data;
+  }
 
-    const plainData = JSON.parse(decrypted.data);
-    return plainData;
+  bytesToBase64(bytes) {
+    let binary = '';
+    for (let index = 0; index < bytes.length; index += 1) {
+      binary += String.fromCharCode(bytes[index]);
+    }
+    return btoa(binary);
   }
 
   validateEncryptedPayload(encryptedPayload) {

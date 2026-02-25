@@ -3,13 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'"
+    />
     <meta name="theme-color" content="#2563eb" />
     <title>密碼管理</title>
     <link rel="manifest" href="./manifest.json" />
     <link rel="icon" type="image/x-icon" href="./favicon.ico" />
     <link rel="icon" type="image/png" sizes="192x192" href="./images/192.png" />
     <link rel="apple-touch-icon" href="./images/192.png" />
-    <link rel="stylesheet" href="./styles.css?v=2026022512" />
+    <link rel="stylesheet" href="./styles.css?v=2026022513" />
   </head>
   <body>
     <div class="app-container">
@@ -174,9 +178,9 @@
                   <table>
                     <thead>
                       <tr>
-                        <th style="width: 80px">流水號</th>
+                        <th class="th-col-seq">流水號</th>
                         <th>名稱</th>
-                        <th style="width: 120px">操作</th>
+                        <th class="th-col-actions">操作</th>
                       </tr>
                     </thead>
                     <tbody id="categoryMasterBody"></tbody>
@@ -213,9 +217,9 @@
                   <table>
                     <thead>
                       <tr>
-                        <th style="width: 80px">流水號</th>
+                        <th class="th-col-seq">流水號</th>
                         <th>名稱</th>
-                        <th style="width: 120px">操作</th>
+                        <th class="th-col-actions">操作</th>
                       </tr>
                     </thead>
                     <tbody id="typeMasterBody"></tbody>
@@ -235,7 +239,7 @@
                 <th>帳號</th>
                 <th>密碼歷程</th>
                 <th>備註</th>
-                <th style="width: 120px">操作</th>
+                <th class="th-col-actions">操作</th>
               </tr>
             </thead>
             <tbody id="recordTableBody"></tbody>
@@ -370,6 +374,6 @@
       </form>
     </dialog>
 
-    <script type="module" src="./src/main.js?v=2026022512"></script>
+    <script type="module" src="./src/main.js?v=2026022513"></script>
   </body>
 </html>

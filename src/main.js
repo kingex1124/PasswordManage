@@ -18,7 +18,6 @@ const state = {
     keyword: "",
     sortMode: "default",
   },
-  archivePassword: "",
   selectedCategoryIdForTypeMaintenance: null,
   importedFileHandle: null,
   visibility: new Set(),
@@ -33,6 +32,7 @@ const state = {
 
 const FILTER_ALL_VALUE = "__ALL__";
 let deferredInstallPrompt = null;
+let currentArchivePassword = "";
 
 const encryptionService = new EncryptionService();
 const importService = new ImportService();
@@ -829,8 +829,15 @@ function renderRecords() {
       <td></td>
     `;
 
-    row.children[0].innerHTML = `<span class="badge">${record.category}</span>`;
-    row.children[1].innerHTML = `<span class="badge badge-type">${record.type}</span>`;
+    const categoryBadge = document.createElement("span");
+    categoryBadge.className = "badge";
+    categoryBadge.textContent = record.category;
+    row.children[0].appendChild(categoryBadge);
+
+    const typeBadge = document.createElement("span");
+    typeBadge.className = "badge badge-type";
+    typeBadge.textContent = record.type;
+    row.children[1].appendChild(typeBadge);
     const accountText = document.createElement("span");
     accountText.className = "account-text";
     accountText.textContent = record.account;
@@ -935,8 +942,8 @@ async function handleImport(encryptedText, fileHandle = null) {
       inputPassword,
     );
     state.data = PasswordRecordService.normalizeImportedPlainData(plainData);
-    state.archivePassword = inputPassword;
     state.importedFileHandle = fileHandle;
+    currentArchivePassword = inputPassword;
     importService.clearCooldown();
     clearAllVisibility();
     clearAllAccountVisibility();
@@ -985,16 +992,18 @@ async function handleExportClick() {
     const inputPassword = await askPassword({
       title: "存檔",
       message: "請輸入存檔密碼（可留空為目前密碼）",
-      defaultValue: state.archivePassword || "",
+      defaultValue: currentArchivePassword || "",
     });
     if (inputPassword === null) {
       return;
     }
-    state.archivePassword = inputPassword;
+
+    const archivePassword = inputPassword || currentArchivePassword || "";
+    currentArchivePassword = archivePassword;
 
     const encryptedPayload = await encryptionService.encryptRecords(
       state.data,
-      state.archivePassword,
+      archivePassword,
     );
     const saveResult = await FileService.saveEncryptedPayload(
       encryptedPayload,
@@ -1100,12 +1109,12 @@ function bindEvents() {
     const newPassword = await askPassword({
       title: "變更存檔密碼",
       message: "請輸入新的存檔密碼",
-      defaultValue: state.archivePassword || "",
+      defaultValue: currentArchivePassword || "",
     });
     if (newPassword === null) {
       return;
     }
-    state.archivePassword = newPassword;
+    currentArchivePassword = newPassword;
     setMessage("已更新存檔密碼，將於下次匯出生效", "success");
   });
 

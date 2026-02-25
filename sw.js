@@ -1,8 +1,8 @@
-const CACHE_NAME = 'password-manage-cache-v3';
+const CACHE_NAME = 'password-manage-cache-v4';
 const APP_SHELL = [
   './',
   './index.html',
-  './styles.css?v=2026022504',
+  './styles.css?v=2026022512',
   './manifest.json',
   './favicon.ico',
   './images/192.png',
