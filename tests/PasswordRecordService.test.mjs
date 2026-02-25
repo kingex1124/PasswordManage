@@ -80,6 +80,49 @@ test('queryRecords should keep filters and apply default sort', () => {
   assert.equal(result[0].id, '2');
 });
 
+test('queryRecords keyword should match account or note', () => {
+  const data = PasswordRecordService.createEmptyData();
+  data.records = [
+    {
+      id: '1',
+      category: '信箱',
+      type: 'A平台',
+      account: 'alice_mail',
+      passwordHistory: [{ id: 'h1', password: '1', changedAt: '2024-02-24T01:00:00.000Z' }],
+      note: '私人用途',
+      createdAt: '2024-02-24T00:00:00.000Z',
+      updatedAt: '2024-02-24T01:00:00.000Z',
+    },
+    {
+      id: '2',
+      category: '購物',
+      type: 'B平台',
+      account: 'shop_user',
+      passwordHistory: [{ id: 'h2', password: '2', changedAt: '2024-02-24T02:00:00.000Z' }],
+      note: '常用帳號',
+      createdAt: '2024-02-24T00:00:00.000Z',
+      updatedAt: '2024-02-24T02:00:00.000Z',
+    },
+  ];
+
+  const accountMatched = PasswordRecordService.queryRecords(data, {
+    categories: [],
+    types: [],
+    keyword: 'alice',
+    sortMode: 'default',
+  });
+
+  const noteMatched = PasswordRecordService.queryRecords(data, {
+    categories: [],
+    types: [],
+    keyword: '常用',
+    sortMode: 'default',
+  });
+
+  assert.deepEqual(accountMatched.map((record) => record.id), ['1']);
+  assert.deepEqual(noteMatched.map((record) => record.id), ['2']);
+});
+
 test('deleteRecord should remove specific record', () => {
   const data = PasswordRecordService.createEmptyData();
   data.records = [

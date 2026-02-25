@@ -16,7 +16,6 @@ const state = {
     categories: [],
     types: [],
     keyword: "",
-    sortMode: "default",
   },
   selectedCategoryIdForTypeMaintenance: null,
   importedFileHandle: null,
@@ -51,7 +50,6 @@ const elements = {
   categorySortHeader: document.querySelector("#categorySortHeader"),
   typeSortHeader: document.querySelector("#typeSortHeader"),
   accountKeyword: document.querySelector("#accountKeyword"),
-  sortMode: document.querySelector("#sortMode"),
   messageArea: document.querySelector("#messageArea"),
   messageText: document.querySelector("#messageText"),
   messageCloseBtn: document.querySelector("#messageCloseBtn"),
@@ -504,6 +502,134 @@ function normalizeSingleFilterSelection(selectedValue) {
   return [selectedValue];
 }
 
+function getTypeFilterOptionsBySelectedCategories() {
+  const selectedCategories = state.filters.categories;
+  const { types } = PasswordRecordService.buildFilterOptions(state.data);
+
+  if (!selectedCategories.length) {
+    return types;
+  }
+
+  const selectedCategorySet = new Set(selectedCategories);
+  const categoryIdByName = new Map(
+    (state.data.categories || []).map((category) => [category.name, category.id]),
+  );
+  const selectedCategoryIds = new Set(
+    selectedCategories
+      .map((categoryName) => categoryIdByName.get(categoryName))
+      .filter(Boolean),
+  );
+
+  const masterTypes = PasswordRecordService.sortTypeItems(
+    state.data.types || [],
+    state.data.categories || [],
+  )
+    .filter((typeItem) => selectedCategoryIds.has(typeItem.categoryId))
+    .map((typeItem) => typeItem.name);
+
+  const recordTypes = (state.data.records || [])
+    .filter((record) => selectedCategorySet.has(record.category))
+    .map((record) => record.type)
+    .filter((typeName) => typeName);
+
+  return [...new Set([...masterTypes, ...recordTypes])].filter((typeName) => types.includes(typeName));
+}
+
+function buildTypeFilterRenderModel() {
+  const options = getTypeFilterOptionsBySelectedCategories();
+
+  if (state.filters.categories.length > 0) {
+    return { options, groups: [] };
+  }
+
+  const categoryNameById = new Map(
+    (state.data.categories || []).map((category) => [category.id, category.name]),
+  );
+  const categoryOrder = PasswordRecordService.sortMasterItems(
+    state.data.categories || [],
+  ).map((category) => category.name);
+
+  const groupMap = new Map();
+  const addToGroup = (categoryName, typeName) => {
+    if (!typeName || !options.includes(typeName)) {
+      return;
+    }
+    const normalizedCategory = categoryName || "未分類";
+    if (!groupMap.has(normalizedCategory)) {
+      groupMap.set(normalizedCategory, new Set());
+    }
+    groupMap.get(normalizedCategory).add(typeName);
+  };
+
+  PasswordRecordService.sortTypeItems(
+    state.data.types || [],
+    state.data.categories || [],
+  ).forEach((typeItem) => {
+    const categoryName = categoryNameById.get(typeItem.categoryId) || "未分類";
+    addToGroup(categoryName, typeItem.name);
+  });
+
+  (state.data.records || []).forEach((record) => {
+    addToGroup(record.category || "未分類", record.type);
+  });
+
+  const dynamicCategories = [...groupMap.keys()].filter(
+    (categoryName) => !categoryOrder.includes(categoryName),
+  ).sort((left, right) => left.localeCompare(right, "zh-Hant"));
+  const orderedCategories = [...categoryOrder, ...dynamicCategories]
+    .filter((categoryName, index, source) => source.indexOf(categoryName) === index)
+    .filter((categoryName) => groupMap.has(categoryName));
+
+  const groups = orderedCategories.map((categoryName) => {
+    const typeNames = [...(groupMap.get(categoryName) || [])]
+      .sort((left, right) => left.localeCompare(right, "zh-Hant"));
+    return {
+      label: categoryName,
+      options: typeNames.map((typeName) => ({
+        value: typeName,
+        text: `${categoryName} / ${typeName}`,
+      })),
+    };
+  }).filter((group) => group.options.length > 0);
+
+  return { options, groups };
+}
+
+function fillTypeFilterSelect(renderModel, selectedValues) {
+  const current = new Set(selectedValues);
+  elements.typeFilter.replaceChildren();
+
+  const allOption = document.createElement("option");
+  allOption.value = FILTER_ALL_VALUE;
+  allOption.textContent = "全部";
+  allOption.selected = selectedValues.length === 0;
+  elements.typeFilter.appendChild(allOption);
+
+  if (!renderModel.groups.length) {
+    renderModel.options.forEach((typeName) => {
+      const option = document.createElement("option");
+      option.value = typeName;
+      option.textContent = typeName;
+      option.selected = current.has(typeName);
+      elements.typeFilter.appendChild(option);
+    });
+    return;
+  }
+
+  renderModel.groups.forEach((group) => {
+    const optgroup = document.createElement("optgroup");
+    optgroup.label = group.label;
+    group.options.forEach((groupOption) => {
+      const option = document.createElement("option");
+      option.value = groupOption.value;
+      option.textContent = groupOption.text;
+      option.selected = current.has(groupOption.value);
+      optgroup.appendChild(option);
+    });
+    elements.typeFilter.appendChild(optgroup);
+  });
+}
+
 function promptMasterInput(title, defaultName = "") {
   const name = window.prompt(`${title} - 名稱`, defaultName);
   if (name === null) {
@@ -726,21 +852,22 @@ function renderMasterMaintenance() {
 }
 
 function updateFilterOptions() {
-  const { categories, types } = PasswordRecordService.buildFilterOptions(
+  const { categories } = PasswordRecordService.buildFilterOptions(
     state.data,
   );
   state.filters.categories = state.filters.categories.filter((item) =>
     categories.includes(item),
   );
+  const typeFilterRenderModel = buildTypeFilterRenderModel();
   state.filters.types = state.filters.types.filter((item) =>
-    types.includes(item),
+    typeFilterRenderModel.options.includes(item),
   );
   fillFilterSelect(
     elements.categoryFilter,
     categories,
     state.filters.categories,
   );
-  fillFilterSelect(elements.typeFilter, types, state.filters.types);
+  fillTypeFilterSelect(typeFilterRenderModel, state.filters.types);
 }
 
 function updateTableSortHeaderUI() {
@@ -1387,6 +1514,9 @@ function bindEvents() {
       PasswordRecordService.buildFilterOptions(state.data).categories,
       state.filters.categories,
     );
+    const typeFilterRenderModel = buildTypeFilterRenderModel();
+    state.filters.types = state.filters.types.filter((item) => typeFilterRenderModel.options.includes(item));
+    fillTypeFilterSelect(typeFilterRenderModel, state.filters.types);
     renderRecords();
   });
 
@@ -1394,21 +1524,12 @@ function bindEvents() {
     state.filters.types = normalizeSingleFilterSelection(
       elements.typeFilter.value,
     );
-    fillFilterSelect(
-      elements.typeFilter,
-      PasswordRecordService.buildFilterOptions(state.data).types,
-      state.filters.types,
-    );
+    fillTypeFilterSelect(buildTypeFilterRenderModel(), state.filters.types);
     renderRecords();
   });
 
   elements.accountKeyword.addEventListener("input", () => {
     state.filters.keyword = elements.accountKeyword.value;
-    renderRecords();
-  });
-
-  elements.sortMode.addEventListener("change", () => {
-    state.filters.sortMode = elements.sortMode.value;
     renderRecords();
   });
 

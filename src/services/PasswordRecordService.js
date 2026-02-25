@@ -476,7 +476,11 @@ export class PasswordRecordService {
     }
     if (keyword.trim()) {
       const target = keyword.trim().toLowerCase();
-      result = result.filter((record) => record.account.toLowerCase().includes(target));
+      result = result.filter((record) => {
+        const accountMatched = String(record.account || '').toLowerCase().includes(target);
+        const noteMatched = String(record.note || '').toLowerCase().includes(target);
+        return accountMatched || noteMatched;
+      });
     }
 
     if (sortMode === 'updatedDesc') {
