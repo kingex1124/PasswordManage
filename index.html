@@ -9,27 +9,30 @@
     <link rel="icon" type="image/x-icon" href="./favicon.ico" />
     <link rel="icon" type="image/png" sizes="192x192" href="./images/192.png" />
     <link rel="apple-touch-icon" href="./images/192.png" />
-    <link rel="stylesheet" href="./styles.css?v=2026022508" />
+    <link rel="stylesheet" href="./styles.css?v=2026022509" />
   </head>
   <body>
     <div class="app-container">
       <header class="toolbar">
-        <h1>
-          <svg
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-          </svg>
-          密碼管理
-        </h1>
+        <div class="toolbar-brand">
+          <h1>
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+            密碼管理
+          </h1>
+          <button id="installAppBtn" type="button" hidden>安裝 App</button>
+        </div>
         <div class="toolbar-actions">
           <button id="addRecordBtn" type="button">
             <svg
@@ -102,24 +105,6 @@
           </button>
         </div>
       </header>
-
-      <section id="pwaInstallHint" class="card install-hint" hidden>
-        <div class="install-hint-content">
-          <strong id="pwaInstallTitle">安裝 App</strong>
-          <p id="pwaInstallText"></p>
-        </div>
-        <div class="install-hint-actions">
-          <button id="installAppBtn" type="button" hidden>安裝 App</button>
-          <button
-            id="dismissInstallHintBtn"
-            type="button"
-            class="message-close-btn"
-            aria-label="關閉安裝提示"
-          >
-            ×
-          </button>
-        </div>
-      </section>
 
       <main>
         <section class="card filters">
@@ -363,6 +348,6 @@
       </form>
     </dialog>
 
-    <script type="module" src="./src/main.js?v=2026022508"></script>
+    <script type="module" src="./src/main.js?v=2026022509"></script>
   </body>
 </html>

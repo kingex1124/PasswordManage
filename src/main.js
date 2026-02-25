@@ -27,7 +27,6 @@ const state = {
 
 const FILTER_ALL_VALUE = "__ALL__";
 let deferredInstallPrompt = null;
-let installHintDismissed = false;
 
 const encryptionService = new EncryptionService();
 const importService = new ImportService();
@@ -46,11 +45,7 @@ const elements = {
   messageArea: document.querySelector("#messageArea"),
   messageText: document.querySelector("#messageText"),
   messageCloseBtn: document.querySelector("#messageCloseBtn"),
-  pwaInstallHint: document.querySelector("#pwaInstallHint"),
-  pwaInstallTitle: document.querySelector("#pwaInstallTitle"),
-  pwaInstallText: document.querySelector("#pwaInstallText"),
   installAppBtn: document.querySelector("#installAppBtn"),
-  dismissInstallHintBtn: document.querySelector("#dismissInstallHintBtn"),
   recordTableBody: document.querySelector("#recordTableBody"),
   recordModal: document.querySelector("#recordModal"),
   recordModalTitle: document.querySelector("#recordModalTitle"),
@@ -122,51 +117,29 @@ async function isLikelyInstalledOnDevice() {
   }
 }
 
-function dismissInstallHint() {
-  installHintDismissed = true;
-  elements.pwaInstallHint.hidden = true;
-}
-
-function showInstallHint(title, text, showInstallButton) {
-  if (installHintDismissed || isStandaloneMode()) {
-    return;
-  }
-
-  elements.pwaInstallTitle.textContent = title;
-  elements.pwaInstallText.textContent = text;
-  elements.installAppBtn.hidden = !showInstallButton;
-  elements.pwaInstallHint.hidden = false;
-}
-
 async function setupPwaInstallExperience() {
   const isInstalled = await isLikelyInstalledOnDevice();
   if (isInstalled) {
-    elements.pwaInstallHint.hidden = true;
+    elements.installAppBtn.hidden = true;
     return;
   }
 
   if (isIosDevice()) {
-    showInstallHint(
-      "安裝 App（iPhone/iPad）",
-      "請點 Safari 分享按鈕，再選「加入主畫面」。",
-      false,
-    );
+    elements.installAppBtn.hidden = false;
+    return;
   }
+
+  elements.installAppBtn.hidden = true;
 
   window.addEventListener("beforeinstallprompt", (event) => {
     event.preventDefault();
     deferredInstallPrompt = event;
-    installHintDismissed = false;
-    showInstallHint(
-      "安裝 App",
-      "點擊安裝後，可像原生 App 一樣從桌面快速開啟。",
-      true,
-    );
+    elements.installAppBtn.hidden = false;
   });
 
   window.addEventListener("appinstalled", () => {
     deferredInstallPrompt = null;
-    elements.pwaInstallHint.hidden = true;
+    elements.installAppBtn.hidden = true;
   });
 }
 
@@ -1024,11 +997,12 @@ function bindEvents() {
     clearMessage();
   });
 
-  elements.dismissInstallHintBtn.addEventListener("click", () => {
-    dismissInstallHint();
-  });
-
   elements.installAppBtn.addEventListener("click", async () => {
+    if (isIosDevice()) {
+      setMessage("請點 Safari 分享按鈕，再選「加入主畫面」", "success");
+      return;
+    }
+
     if (!deferredInstallPrompt) {
       setMessage("目前裝置暫時無法顯示安裝提示，請用瀏覽器選單加入主畫面", "error");
       return;
@@ -1037,7 +1011,7 @@ function bindEvents() {
     deferredInstallPrompt.prompt();
     const result = await deferredInstallPrompt.userChoice;
     if (result.outcome === "accepted") {
-      elements.pwaInstallHint.hidden = true;
+      elements.installAppBtn.hidden = true;
     }
     deferredInstallPrompt = null;
   });
