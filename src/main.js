@@ -26,8 +26,8 @@ const state = {
 };
 
 const FILTER_ALL_VALUE = "__ALL__";
-const INSTALL_HINT_DISMISSED_KEY = "pm_pwa_install_hint_dismissed";
 let deferredInstallPrompt = null;
+let installHintDismissed = false;
 
 const encryptionService = new EncryptionService();
 const importService = new ImportService();
@@ -105,25 +105,13 @@ function isIosDevice() {
   return /iphone|ipad|ipod/.test(userAgent) || isTouchMac;
 }
 
-function isInstallHintDismissed() {
-  try {
-    return window.localStorage.getItem(INSTALL_HINT_DISMISSED_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
 function dismissInstallHint() {
+  installHintDismissed = true;
   elements.pwaInstallHint.hidden = true;
-  try {
-    window.localStorage.setItem(INSTALL_HINT_DISMISSED_KEY, "1");
-  } catch {
-    setMessage("已暫時隱藏安裝提示（此裝置不支援記住設定）", "success");
-  }
 }
 
 function showInstallHint(title, text, showInstallButton) {
-  if (isInstallHintDismissed() || isStandaloneMode()) {
+  if (installHintDismissed || isStandaloneMode()) {
     return;
   }
 
@@ -145,11 +133,18 @@ function setupPwaInstallExperience() {
       "請點 Safari 分享按鈕，再選「加入主畫面」。",
       false,
     );
+  } else {
+    showInstallHint(
+      "安裝 App",
+      "可先從瀏覽器選單加入主畫面；若支援一鍵安裝，會顯示安裝按鈕。",
+      false,
+    );
   }
 
   window.addEventListener("beforeinstallprompt", (event) => {
     event.preventDefault();
     deferredInstallPrompt = event;
+    installHintDismissed = false;
     showInstallHint(
       "安裝 App",
       "點擊安裝後，可像原生 App 一樣從桌面快速開啟。",
