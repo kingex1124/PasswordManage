@@ -9,7 +9,7 @@
     <link rel="icon" type="image/x-icon" href="./favicon.ico" />
     <link rel="icon" type="image/png" sizes="192x192" href="./images/192.png" />
     <link rel="apple-touch-icon" href="./images/192.png" />
-    <link rel="stylesheet" href="./styles.css?v=2026022506" />
+    <link rel="stylesheet" href="./styles.css?v=2026022507" />
   </head>
   <body>
     <div class="app-container">
@@ -110,7 +110,14 @@
         </div>
         <div class="install-hint-actions">
           <button id="installAppBtn" type="button" hidden>安裝 App</button>
-          <button id="dismissInstallHintBtn" type="button">知道了</button>
+          <button
+            id="dismissInstallHintBtn"
+            type="button"
+            class="message-close-btn"
+            aria-label="關閉安裝提示"
+          >
+            ×
+          </button>
         </div>
       </section>
 
@@ -356,6 +363,6 @@
       </form>
     </dialog>
 
-    <script type="module" src="./src/main.js?v=2026022506"></script>
+    <script type="module" src="./src/main.js?v=2026022507"></script>
   </body>
 </html>
