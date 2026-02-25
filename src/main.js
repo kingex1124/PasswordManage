@@ -19,6 +19,7 @@ const state = {
     sortMode: "default",
   },
   archivePassword: "",
+  selectedCategoryIdForTypeMaintenance: null,
   importedFileHandle: null,
   visibility: new Set(),
   autoHideTimers: new Map(),
@@ -56,6 +57,10 @@ const elements = {
   fileInput: document.querySelector("#fileInput"),
   categoryMasterBody: document.querySelector("#categoryMasterBody"),
   typeMasterBody: document.querySelector("#typeMasterBody"),
+  toggleMasterBtn: document.querySelector("#toggleMasterBtn"),
+  masterPanelBody: document.querySelector("#masterPanelBody"),
+  typeBlockTitle: document.querySelector("#typeBlockTitle"),
+  typeBlockHint: document.querySelector("#typeBlockHint"),
   passwordDialog: document.querySelector("#passwordDialog"),
   passwordDialogForm: document.querySelector("#passwordDialogForm"),
   passwordDialogTitle: document.querySelector("#passwordDialogTitle"),
@@ -279,14 +284,28 @@ function refreshRecordFormMasterSelects(record = null) {
   const categories = PasswordRecordService.sortMasterItems(
     state.data.categories || [],
   );
-  const types = PasswordRecordService.sortMasterItems(state.data.types || []);
 
   fillRecordMasterSelect(
     elements.categoryInput,
     categories,
     record?.category || "",
   );
-  fillRecordMasterSelect(elements.typeInput, types, record?.type || "");
+
+  const selectedCategory = record?.category || elements.categoryInput.value || "";
+  const categoryTypes = PasswordRecordService.getTypesByCategory(
+    state.data,
+    selectedCategory,
+  );
+  fillRecordMasterSelect(elements.typeInput, categoryTypes, record?.type || "");
+}
+
+function syncTypeOptionsBySelectedCategory(selectedType = "") {
+  const selectedCategory = elements.categoryInput.value;
+  const categoryTypes = PasswordRecordService.getTypesByCategory(
+    state.data,
+    selectedCategory,
+  );
+  fillRecordMasterSelect(elements.typeInput, categoryTypes, selectedType);
 }
 
 function openRecordModal(record = null) {
@@ -361,11 +380,35 @@ function promptMasterInput(title, defaultName = "") {
   return { name };
 }
 
+function getSelectedCategoryForTypeMaintenance() {
+  const categories = PasswordRecordService.sortMasterItems(
+    state.data.categories || [],
+  );
+
+  if (!categories.length) {
+    state.selectedCategoryIdForTypeMaintenance = null;
+    return null;
+  }
+
+  const found = categories.find(
+    (category) => category.id === state.selectedCategoryIdForTypeMaintenance,
+  );
+  if (found) {
+    return found;
+  }
+
+  state.selectedCategoryIdForTypeMaintenance = categories[0].id;
+  return categories[0];
+}
+
 function renderMasterTable(masterType, bodyElement) {
   const listKey = masterType === "category" ? "categories" : "types";
-  const items = PasswordRecordService.sortMasterItems(
-    state.data[listKey] || [],
-  );
+  const selectedCategory = getSelectedCategoryForTypeMaintenance();
+  const items = masterType === "category"
+    ? PasswordRecordService.sortMasterItems(state.data[listKey] || [])
+    : (selectedCategory
+      ? PasswordRecordService.getTypesByCategory(state.data, selectedCategory.name)
+      : []);
   bodyElement.innerHTML = "";
 
   if (items.length === 0) {
@@ -373,7 +416,9 @@ function renderMasterTable(masterType, bodyElement) {
     const cell = document.createElement("td");
     cell.colSpan = 3;
     cell.className = "empty-state";
-    cell.textContent = "目前沒有資料";
+    cell.textContent = masterType === "type"
+      ? (selectedCategory ? "此類別目前沒有種類" : "請先選擇類別")
+      : "目前沒有資料";
     row.appendChild(cell);
     bodyElement.appendChild(row);
     return;
@@ -383,6 +428,16 @@ function renderMasterTable(masterType, bodyElement) {
     const row = document.createElement("tr");
     const seqCell = document.createElement("td");
     seqCell.textContent = String(item.seq);
+    if (masterType === "category") {
+      row.classList.toggle(
+        "master-row-selected",
+        item.id === state.selectedCategoryIdForTypeMaintenance,
+      );
+      row.addEventListener("click", () => {
+        state.selectedCategoryIdForTypeMaintenance = item.id;
+        renderMasterMaintenance();
+      });
+    }
     const nameCell = document.createElement("td");
     nameCell.textContent = item.name;
 
@@ -396,8 +451,13 @@ function renderMasterTable(masterType, bodyElement) {
     editBtn.title = "修改";
     editBtn.innerHTML =
       '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>';
-    editBtn.addEventListener("click", () => {
-      const result = promptMasterInput("修改", item.name);
+    editBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+
+      const result = masterType === "type"
+        ? promptMasterInput("修改種類", item.name)
+        : promptMasterInput("修改", item.name);
+
       if (!result) {
         return;
       }
@@ -406,6 +466,7 @@ function renderMasterTable(masterType, bodyElement) {
         PasswordRecordService.saveMasterItem(state.data, masterType, {
           id: item.id,
           name: result.name,
+          ...(masterType === "type" ? { categoryId: item.categoryId } : {}),
         });
         updateFilterOptions();
         renderMasterMaintenance();
@@ -422,7 +483,8 @@ function renderMasterTable(masterType, bodyElement) {
     deleteBtn.title = "刪除";
     deleteBtn.innerHTML =
       '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>';
-    deleteBtn.addEventListener("click", () => {
+    deleteBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
       if (!window.confirm("確定要刪除這筆主檔資料嗎？")) {
         return;
       }
@@ -459,6 +521,14 @@ function handleMasterError(error) {
     setMessage("名稱不可重複", "error");
     return;
   }
+  if (error.message === "MASTER_CATEGORY_REQUIRED") {
+    setMessage("請選擇有效的所屬類別", "error");
+    return;
+  }
+  if (error.message === "MASTER_HAS_CHILDREN") {
+    setMessage("此類別底下仍有種類，請先刪除種類", "error");
+    return;
+  }
   if (error.message === "MASTER_IN_USE") {
     setMessage("此主檔已被帳密資料使用，無法刪除", "error");
     return;
@@ -467,6 +537,14 @@ function handleMasterError(error) {
 }
 
 function renderMasterMaintenance() {
+  const selectedCategory = getSelectedCategoryForTypeMaintenance();
+  elements.typeBlockTitle.textContent = selectedCategory
+    ? `種類維護（${selectedCategory.name}）`
+    : "種類維護";
+  elements.typeBlockHint.textContent = selectedCategory
+    ? "以下僅顯示此類別底下的種類"
+    : "請先在左側選擇類別";
+
   renderMasterTable("category", elements.categoryMasterBody);
   renderMasterTable("type", elements.typeMasterBody);
   refreshRecordFormMasterSelects();
@@ -698,6 +776,12 @@ async function handleExportClick() {
 }
 
 function bindEvents() {
+  elements.toggleMasterBtn.addEventListener("click", () => {
+    elements.masterPanelBody.classList.toggle("is-collapsed");
+    const isCollapsed = elements.masterPanelBody.classList.contains("is-collapsed");
+    elements.toggleMasterBtn.textContent = isCollapsed ? "展開" : "收合";
+  });
+
   elements.addCategoryBtn.addEventListener("click", () => {
     const result = promptMasterInput("新增類別", "");
     if (!result) {
@@ -716,13 +800,25 @@ function bindEvents() {
   });
 
   elements.addTypeBtn.addEventListener("click", () => {
-    const result = promptMasterInput("新增種類", "");
+    const selectedCategory = getSelectedCategoryForTypeMaintenance();
+    if (!selectedCategory) {
+      setMessage("請先新增類別，再新增種類", "error");
+      return;
+    }
+
+    const result = promptMasterInput(
+      `新增種類（${selectedCategory.name}）`,
+      "",
+    );
     if (!result) {
       return;
     }
 
     try {
-      PasswordRecordService.saveMasterItem(state.data, "type", result);
+      PasswordRecordService.saveMasterItem(state.data, "type", {
+        name: result.name,
+        categoryId: selectedCategory.id,
+      });
       updateFilterOptions();
       renderMasterMaintenance();
       renderRecords();
@@ -734,6 +830,10 @@ function bindEvents() {
 
   elements.addRecordBtn.addEventListener("click", () => {
     openRecordModal();
+  });
+
+  elements.categoryInput.addEventListener("change", () => {
+    syncTypeOptionsBySelectedCategory();
   });
 
   elements.importBtn.addEventListener("click", handleImportClick);

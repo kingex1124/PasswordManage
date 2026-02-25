@@ -51,14 +51,15 @@ export class PasswordRecordService {
       };
     });
 
-    const normalizedCategories = PasswordRecordService.normalizeMasterItems(
+    const normalizedCategories = PasswordRecordService.normalizeCategoryItems(
       plainData?.categories,
       records.map((record) => record.category).filter((value) => value),
     );
 
-    const normalizedTypes = PasswordRecordService.normalizeMasterItems(
+    const normalizedTypes = PasswordRecordService.normalizeTypeItems(
       plainData?.types,
-      records.map((record) => record.type).filter((value) => value),
+      normalizedCategories,
+      records,
     );
 
     return {
@@ -69,7 +70,7 @@ export class PasswordRecordService {
     };
   }
 
-  static normalizeMasterItems(rawItems, fallbackNames) {
+  static normalizeCategoryItems(rawItems, fallbackNames) {
     if (Array.isArray(rawItems) && rawItems.length > 0) {
       const normalized = rawItems
         .map((item, index) => {
@@ -106,6 +107,75 @@ export class PasswordRecordService {
     return PasswordRecordService.sortMasterItems(fallback);
   }
 
+  static normalizeTypeItems(rawItems, categories, records) {
+    const recordsCategoryMap = new Map();
+    records.forEach((record) => {
+      if (!record.type || !record.category || recordsCategoryMap.has(record.type)) {
+        return;
+      }
+      recordsCategoryMap.set(record.type, record.category);
+    });
+
+    const categoryByName = new Map(categories.map((category) => [category.name, category]));
+
+    if (Array.isArray(rawItems) && rawItems.length > 0) {
+      const normalized = rawItems
+        .map((item, index) => {
+          if (typeof item === 'string') {
+            const matchedCategoryName = recordsCategoryMap.get(item.trim()) || '';
+            const matchedCategory = categoryByName.get(matchedCategoryName);
+            return {
+              id: generateId(),
+              name: item.trim(),
+              seq: index + 1,
+              categoryId: matchedCategory?.id || null,
+            };
+          }
+
+          const name = String(item?.name ?? '').trim();
+          const seqValue = Number(item?.seq);
+          const categoryIdByName = categoryByName.get(String(item?.categoryName ?? item?.category ?? '').trim())?.id || null;
+
+          return {
+            id: item?.id || generateId(),
+            name,
+            seq: Number.isFinite(seqValue) ? seqValue : (index + 1),
+            categoryId: item?.categoryId || categoryIdByName,
+          };
+        })
+        .filter((item) => item.name);
+
+      return PasswordRecordService.sortTypeItems(
+        PasswordRecordService.deduplicateTypeItems(normalized),
+        categories,
+      );
+    }
+
+    const seenKey = new Set();
+    const fallback = [];
+    records.forEach((record) => {
+      if (!record.type) {
+        return;
+      }
+
+      const category = categoryByName.get(record.category || '');
+      const key = `${category?.id || ''}::${record.type}`;
+      if (seenKey.has(key)) {
+        return;
+      }
+      seenKey.add(key);
+
+      fallback.push({
+        id: generateId(),
+        name: record.type,
+        seq: PasswordRecordService.getNextMasterSeq(fallback, category?.id || null),
+        categoryId: category?.id || null,
+      });
+    });
+
+    return PasswordRecordService.sortTypeItems(fallback, categories);
+  }
+
   static deduplicateMasterByName(items) {
     const nameSet = new Set();
     const deduplicated = [];
@@ -119,12 +189,53 @@ export class PasswordRecordService {
     return deduplicated;
   }
 
+  static deduplicateTypeItems(items) {
+    const keySet = new Set();
+    const deduplicated = [];
+    items.forEach((item) => {
+      const key = `${item.categoryId || ''}::${item.name}`;
+      if (keySet.has(key)) {
+        return;
+      }
+      keySet.add(key);
+      deduplicated.push(item);
+    });
+    return deduplicated;
+  }
+
   static sortMasterItems(items) {
     return [...items].sort((left, right) => {
       const seqCompare = left.seq - right.seq;
       if (seqCompare !== 0) {
         return seqCompare;
       }
+      return left.name.localeCompare(right.name, 'zh-Hant');
+    });
+  }
+
+  static sortTypeItems(items, categories) {
+    const categorySeqById = new Map(categories.map((category) => [category.id, category.seq]));
+    const categoryNameById = new Map(categories.map((category) => [category.id, category.name]));
+
+    return [...items].sort((left, right) => {
+      const leftCategorySeq = categorySeqById.get(left.categoryId) ?? Number.MAX_SAFE_INTEGER;
+      const rightCategorySeq = categorySeqById.get(right.categoryId) ?? Number.MAX_SAFE_INTEGER;
+      if (leftCategorySeq !== rightCategorySeq) {
+        return leftCategorySeq - rightCategorySeq;
+      }
+
+      const leftCategoryName = categoryNameById.get(left.categoryId) || '';
+      const rightCategoryName = categoryNameById.get(right.categoryId) || '';
+      const categoryCompare = leftCategoryName.localeCompare(rightCategoryName, 'zh-Hant');
+      if (categoryCompare !== 0) {
+        return categoryCompare;
+      }
+
+      const seqCompare = left.seq - right.seq;
+      if (seqCompare !== 0) {
+        return seqCompare;
+      }
+
       return left.name.localeCompare(right.name, 'zh-Hant');
     });
   }
@@ -152,20 +263,38 @@ export class PasswordRecordService {
       throw new Error('MASTER_SEQ_INVALID');
     }
 
-    const duplicated = targetList.find((item) => item.name === name && item.id !== input.id);
+    const categoryId = masterType === 'type' ? String(input?.categoryId || '') : null;
+    if (masterType === 'type') {
+      if (!categoryId || !(data.categories || []).some((category) => category.id === categoryId)) {
+        throw new Error('MASTER_CATEGORY_REQUIRED');
+      }
+    }
+
+    const duplicated = targetList.find((item) => {
+      if (masterType === 'type') {
+        return item.name === name && item.id !== input.id && item.categoryId === categoryId;
+      }
+      return item.name === name && item.id !== input.id;
+    });
     if (duplicated) {
       throw new Error('MASTER_NAME_DUPLICATED');
     }
 
     const existingIndex = targetList.findIndex((item) => item.id === input.id);
+    const isTypeCategoryChanged = masterType === 'type' && existingIndex >= 0 && targetList[existingIndex].categoryId !== categoryId;
     const resolvedSeq = existingIndex >= 0
-      ? (Number.isFinite(seqInput) && seqInput > 0 ? seqInput : targetList[existingIndex].seq)
-      : (Number.isFinite(seqInput) && seqInput > 0 ? seqInput : PasswordRecordService.getNextMasterSeq(targetList));
+      ? (Number.isFinite(seqInput) && seqInput > 0
+        ? seqInput
+        : (isTypeCategoryChanged
+          ? PasswordRecordService.getNextMasterSeq(targetList, categoryId)
+          : targetList[existingIndex].seq))
+      : (Number.isFinite(seqInput) && seqInput > 0 ? seqInput : PasswordRecordService.getNextMasterSeq(targetList, categoryId));
 
     const normalizedItem = {
       id: input?.id || generateId(),
       name,
       seq: resolvedSeq,
+      ...(masterType === 'type' ? { categoryId } : {}),
     };
 
     if (existingIndex >= 0) {
@@ -174,15 +303,21 @@ export class PasswordRecordService {
       targetList.push(normalizedItem);
     }
 
-    data[listKey] = PasswordRecordService.sortMasterItems(targetList);
+    data[listKey] = masterType === 'type'
+      ? PasswordRecordService.sortTypeItems(targetList, data.categories || [])
+      : PasswordRecordService.sortMasterItems(targetList);
   }
 
-  static getNextMasterSeq(targetList) {
-    if (!targetList.length) {
+  static getNextMasterSeq(targetList, categoryId = null) {
+    const scopedList = categoryId
+      ? targetList.filter((item) => item.categoryId === categoryId)
+      : targetList;
+
+    if (!scopedList.length) {
       return 1;
     }
 
-    const maxSeq = targetList.reduce((max, item) => {
+    const maxSeq = scopedList.reduce((max, item) => {
       const seq = Number(item.seq);
       if (!Number.isFinite(seq)) {
         return max;
@@ -200,18 +335,41 @@ export class PasswordRecordService {
       return;
     }
 
-    const inUse = data.records.some((record) => {
-      if (masterType === 'category') {
-        return record.category === item.name;
-      }
-      return record.type === item.name;
-    });
+    const inUse = masterType === 'category'
+      ? data.records.some((record) => record.category === item.name)
+      : false;
 
     if (inUse) {
       throw new Error('MASTER_IN_USE');
     }
 
+    if (masterType === 'category') {
+      const hasChildren = (data.types || []).some((typeItem) => typeItem.categoryId === item.id);
+      if (hasChildren) {
+        throw new Error('MASTER_HAS_CHILDREN');
+      }
+    }
+
+    if (masterType === 'type') {
+      const categoryById = new Map((data.categories || []).map((category) => [category.id, category.name]));
+      const categoryName = categoryById.get(item.categoryId) || '';
+      const typeInUse = data.records.some((record) => record.type === item.name && record.category === categoryName);
+      if (typeInUse) {
+        throw new Error('MASTER_IN_USE');
+      }
+    }
+
     data[listKey] = data[listKey].filter((entry) => entry.id !== itemId);
+  }
+
+  static getTypesByCategory(data, categoryName) {
+    const category = (data.categories || []).find((item) => item.name === categoryName);
+    if (!category) {
+      return [];
+    }
+
+    return PasswordRecordService.sortTypeItems(data.types || [], data.categories || [])
+      .filter((typeItem) => typeItem.categoryId === category.id);
   }
 
   static normalizeDate(value) {
@@ -337,7 +495,7 @@ export class PasswordRecordService {
 
   static buildFilterOptions(data) {
     const categoriesFromMaster = PasswordRecordService.sortMasterItems(data.categories || []).map((item) => item.name);
-    const typesFromMaster = PasswordRecordService.sortMasterItems(data.types || []).map((item) => item.name);
+    const typesFromMaster = PasswordRecordService.sortTypeItems(data.types || [], data.categories || []).map((item) => item.name);
 
     const categories = [...new Set([
       ...categoriesFromMaster,

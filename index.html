@@ -100,108 +100,118 @@
         </div>
       </header>
 
-      <section class="card filters">
-        <label>
-          類別篩選
-          <select id="categoryFilter" multiple></select>
-        </label>
-        <label>
-          種類篩選
-          <select id="typeFilter" multiple></select>
-        </label>
-        <label>
-          帳號關鍵字
-          <input id="accountKeyword" type="text" placeholder="輸入帳號關鍵字" />
-        </label>
-        <label>
-          排序方式
-          <select id="sortMode">
-            <option value="default">預設（類別/種類/帳號/更新時間）</option>
-            <option value="updatedDesc">最近更新時間（新→舊）</option>
-            <option value="updatedAsc">最近更新時間（舊→新）</option>
-            <option value="accountAsc">帳號（A→Z）</option>
-          </select>
-        </label>
-      </section>
-
-      <section id="messageArea" class="message" aria-live="polite"></section>
-
       <main>
-        <section class="master-section">
-          <div class="master-block">
-            <div class="master-head">
-              <h2>類別維護</h2>
-              <button
-                id="addCategoryBtn"
-                type="button"
-                class="icon-btn"
-                title="新增類別"
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <line x1="12" y1="5" x2="12" y2="19"></line>
-                  <line x1="5" y1="12" x2="19" y2="12"></line>
-                </svg>
-              </button>
-            </div>
-            <div class="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th style="width: 80px">流水號</th>
-                    <th>名稱</th>
-                    <th style="width: 120px">操作</th>
-                  </tr>
-                </thead>
-                <tbody id="categoryMasterBody"></tbody>
-              </table>
-            </div>
-          </div>
+        <section class="card filters">
+          <label>
+            類別篩選
+            <select id="categoryFilter" multiple></select>
+          </label>
+          <label>
+            種類篩選
+            <select id="typeFilter" multiple></select>
+          </label>
+          <label>
+            帳號關鍵字
+            <input id="accountKeyword" type="text" placeholder="輸入帳號關鍵字" />
+          </label>
+          <label>
+            排序
+            <select id="sortMode">
+              <option value="default">預設（依資料順序）</option>
+              <option value="account-asc">帳號 A → Z</option>
+              <option value="account-desc">帳號 Z → A</option>
+              <option value="category-asc">類別 A → Z</option>
+              <option value="type-asc">種類 A → Z</option>
+            </select>
+          </label>
+        </section>
 
-          <div class="master-block">
-            <div class="master-head">
-              <h2>種類維護</h2>
-              <button
-                id="addTypeBtn"
-                type="button"
-                class="icon-btn"
-                title="新增種類"
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <line x1="12" y1="5" x2="12" y2="19"></line>
-                  <line x1="5" y1="12" x2="19" y2="12"></line>
-                </svg>
-              </button>
-            </div>
-            <div class="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th style="width: 80px">流水號</th>
-                    <th>名稱</th>
-                    <th style="width: 120px">操作</th>
-                  </tr>
-                </thead>
-                <tbody id="typeMasterBody"></tbody>
-              </table>
-            </div>
+        <div id="messageArea" class="message" role="status" aria-live="polite"></div>
+
+        <section class="card master-panel">
+          <div class="master-panel-head">
+            <h2>主檔維護</h2>
+            <button id="toggleMasterBtn" type="button">收合</button>
+          </div>
+          <div id="masterPanelBody">
+            <section class="master-section">
+              <div class="master-block">
+                <div class="master-head">
+                  <h2>類別維護</h2>
+                  <button
+                    id="addCategoryBtn"
+                    type="button"
+                    class="icon-btn"
+                    title="新增類別"
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <line x1="12" y1="5" x2="12" y2="19"></line>
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                  </button>
+                </div>
+                <div class="table-container">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th style="width: 80px">流水號</th>
+                        <th>名稱</th>
+                        <th style="width: 120px">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody id="categoryMasterBody"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="master-block">
+                <div class="master-head">
+                  <h2 id="typeBlockTitle">種類維護</h2>
+                  <button
+                    id="addTypeBtn"
+                    type="button"
+                    class="icon-btn"
+                    title="新增種類"
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <line x1="12" y1="5" x2="12" y2="19"></line>
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                  </button>
+                </div>
+                <p id="typeBlockHint" class="master-hint"></p>
+                <div class="table-container">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th style="width: 80px">流水號</th>
+                        <th>名稱</th>
+                        <th style="width: 120px">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody id="typeMasterBody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
           </div>
         </section>
 

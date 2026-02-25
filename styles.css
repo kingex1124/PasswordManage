@@ -281,12 +281,34 @@ select[multiple] {
 }
 
 /* Master Section */
+.master-panel {
+  padding: 0;
+}
+
+.master-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.master-panel-head h2 {
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+#masterPanelBody.is-collapsed {
+  display: none;
+}
+
 .master-section {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
   gap: 2rem;
-  margin-bottom: 3rem;
+  margin-bottom: 0;
   align-items: start;
+  padding: 1.25rem;
 }
 
 .master-block {
@@ -311,6 +333,16 @@ select[multiple] {
 .master-head h2 {
   font-size: 1.125rem;
   color: var(--text-main);
+}
+
+.master-hint {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  padding: 0 1.5rem 0.75rem;
+}
+
+.master-row-selected {
+  background-color: var(--primary-light);
 }
 
 /* Tables */
