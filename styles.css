@@ -459,6 +459,26 @@ th {
   white-space: nowrap;
 }
 
+.sortable-header {
+  cursor: pointer;
+  user-select: none;
+}
+
+.sortable-header:hover {
+  color: var(--primary);
+}
+
+.account-text {
+  cursor: pointer;
+  user-select: text;
+  -webkit-user-select: text;
+  transition: filter var(--transition-fast);
+}
+
+.account-text.account-masked {
+  filter: blur(4px);
+}
+
 td {
   padding: 1rem 1.25rem;
   border-bottom: 1px solid var(--border);

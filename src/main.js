@@ -23,6 +23,12 @@ const state = {
   importedFileHandle: null,
   visibility: new Set(),
   autoHideTimers: new Map(),
+  accountVisible: new Set(),
+  accountAutoHideTimers: new Map(),
+  tableSort: {
+    column: null,
+    direction: "asc",
+  },
 };
 
 const FILTER_ALL_VALUE = "__ALL__";
@@ -40,6 +46,8 @@ const elements = {
   changeArchivePasswordBtn: document.querySelector("#changeArchivePasswordBtn"),
   categoryFilter: document.querySelector("#categoryFilter"),
   typeFilter: document.querySelector("#typeFilter"),
+  categorySortHeader: document.querySelector("#categorySortHeader"),
+  typeSortHeader: document.querySelector("#typeSortHeader"),
   accountKeyword: document.querySelector("#accountKeyword"),
   sortMode: document.querySelector("#sortMode"),
   messageArea: document.querySelector("#messageArea"),
@@ -686,8 +694,114 @@ function updateFilterOptions() {
   fillFilterSelect(elements.typeFilter, types, state.filters.types);
 }
 
+function updateTableSortHeaderUI() {
+  const categoryArrow = state.tableSort.column === "category"
+    ? (state.tableSort.direction === "asc" ? " ▲" : " ▼")
+    : "";
+  const typeArrow = state.tableSort.column === "type"
+    ? (state.tableSort.direction === "asc" ? " ▲" : " ▼")
+    : "";
+  elements.categorySortHeader.textContent = `類別${categoryArrow}`;
+  elements.typeSortHeader.textContent = `種類${typeArrow}`;
+}
+
+function toggleTableSort(column) {
+  if (state.tableSort.column === column) {
+    state.tableSort.direction = state.tableSort.direction === "asc" ? "desc" : "asc";
+  } else {
+    state.tableSort.column = column;
+    state.tableSort.direction = "asc";
+  }
+  updateTableSortHeaderUI();
+  renderRecords();
+}
+
+function sortRecordsByTableHeader(records) {
+  if (!state.tableSort.column) {
+    return records;
+  }
+
+  const categories = state.data.categories || [];
+  const categorySeqByName = new Map(categories.map((category) => [category.name, Number(category.seq)]));
+  const categoryNameById = new Map(categories.map((category) => [category.id, category.name]));
+  const typeSeqByCategoryAndName = new Map(
+    (state.data.types || []).map((type) => {
+      const categoryName = categoryNameById.get(type.categoryId) || "";
+      return [`${categoryName}::${type.name}`, Number(type.seq)];
+    }),
+  );
+
+  const multiplier = state.tableSort.direction === "asc" ? 1 : -1;
+  const sorted = [...records].sort((left, right) => {
+    if (state.tableSort.column === "category") {
+      const leftSeq = categorySeqByName.get(left.category);
+      const rightSeq = categorySeqByName.get(right.category);
+      if (Number.isFinite(leftSeq) && Number.isFinite(rightSeq) && leftSeq !== rightSeq) {
+        return (leftSeq - rightSeq) * multiplier;
+      }
+      return left.category.localeCompare(right.category, "zh-Hant") * multiplier;
+    }
+
+    const leftKey = `${left.category}::${left.type}`;
+    const rightKey = `${right.category}::${right.type}`;
+    const leftSeq = typeSeqByCategoryAndName.get(leftKey);
+    const rightSeq = typeSeqByCategoryAndName.get(rightKey);
+    if (Number.isFinite(leftSeq) && Number.isFinite(rightSeq) && leftSeq !== rightSeq) {
+      return (leftSeq - rightSeq) * multiplier;
+    }
+    return left.type.localeCompare(right.type, "zh-Hant") * multiplier;
+  });
+
+  return sorted;
+}
+
+function setAccountMasked(element, masked) {
+  element.classList.toggle("account-masked", masked);
+}
+
+function hideAccount(recordId, shouldRender = true) {
+  state.accountVisible.delete(recordId);
+  const timerId = state.accountAutoHideTimers.get(recordId);
+  if (timerId) {
+    clearTimeout(timerId);
+    state.accountAutoHideTimers.delete(recordId);
+  }
+  if (shouldRender) {
+    renderRecords();
+  }
+}
+
+function showAccount(recordId) {
+  state.accountVisible.add(recordId);
+  const existingTimer = state.accountAutoHideTimers.get(recordId);
+  if (existingTimer) {
+    clearTimeout(existingTimer);
+  }
+  const timerId = setTimeout(() => hideAccount(recordId), 30000);
+  state.accountAutoHideTimers.set(recordId, timerId);
+}
+
+function toggleAccountMask(recordId) {
+  if (state.accountVisible.has(recordId)) {
+    hideAccount(recordId, false);
+  } else {
+    showAccount(recordId);
+  }
+  renderRecords();
+}
+
+function clearAllAccountVisibility() {
+  for (const timerId of state.accountAutoHideTimers.values()) {
+    clearTimeout(timerId);
+  }
+  state.accountVisible.clear();
+  state.accountAutoHideTimers.clear();
+}
+
 function renderRecords() {
-  const records = PasswordRecordService.queryRecords(state.data, state.filters);
+  const records = sortRecordsByTableHeader(
+    PasswordRecordService.queryRecords(state.data, state.filters),
+  );
   elements.recordTableBody.innerHTML = "";
 
   if (records.length === 0) {
@@ -714,7 +828,13 @@ function renderRecords() {
 
     row.children[0].innerHTML = `<span class="badge">${record.category}</span>`;
     row.children[1].innerHTML = `<span class="badge badge-type">${record.type}</span>`;
-    row.children[2].textContent = record.account;
+    const accountText = document.createElement("span");
+    accountText.className = "account-text";
+    accountText.textContent = record.account;
+    accountText.title = "點擊切換顯示/馬賽克";
+    setAccountMasked(accountText, !state.accountVisible.has(record.id));
+    accountText.addEventListener("click", () => toggleAccountMask(record.id));
+    row.children[2].appendChild(accountText);
 
     const historyContainer = document.createElement("div");
     historyContainer.className = "history-list";
@@ -774,6 +894,7 @@ function renderRecords() {
       if (!window.confirm("請再次確認刪除，刪除後無法復原。")) {
         return;
       }
+      hideAccount(record.id, false);
       PasswordRecordService.deleteRecord(state.data, record.id);
       setMessage("刪除完成", "success");
       updateFilterOptions();
@@ -815,6 +936,7 @@ async function handleImport(encryptedText, fileHandle = null) {
     state.importedFileHandle = fileHandle;
     importService.clearCooldown();
     clearAllVisibility();
+    clearAllAccountVisibility();
     updateFilterOptions();
     renderMasterMaintenance();
     renderRecords();
@@ -894,6 +1016,14 @@ async function handleExportClick() {
 }
 
 function bindEvents() {
+  elements.categorySortHeader.addEventListener("click", () => {
+    toggleTableSort("category");
+  });
+
+  elements.typeSortHeader.addEventListener("click", () => {
+    toggleTableSort("type");
+  });
+
   elements.toggleMasterBtn.addEventListener("click", () => {
     elements.masterPanelBody.classList.toggle("is-collapsed");
     const isCollapsed = elements.masterPanelBody.classList.contains("is-collapsed");
@@ -1094,6 +1224,7 @@ async function registerServiceWorker() {
 }
 
 function init() {
+  updateTableSortHeaderUI();
   bindEvents();
   setupPwaInstallExperience();
   updateFilterOptions();
