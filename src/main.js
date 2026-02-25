@@ -32,6 +32,9 @@ const state = {
 
 const FILTER_ALL_VALUE = "__ALL__";
 let deferredInstallPrompt = null;
+const MIN_ARCHIVE_PASSWORD_LENGTH = 12;
+const AUTO_LOCK_TIMEOUT_MS = 5 * 60 * 1000;
+let autoLockTimerId = null;
 
 const encryptionService = new EncryptionService();
 const importService = new ImportService();
@@ -101,6 +104,63 @@ function clearMessage() {
   setMessage("");
 }
 
+function createSvgElement(tagName, attributes = {}) {
+  const element = document.createElementNS("http://www.w3.org/2000/svg", tagName);
+  Object.entries(attributes).forEach(([key, value]) => {
+    element.setAttribute(key, String(value));
+  });
+  return element;
+}
+
+function createSvgIcon(iconName, size = 16) {
+  const icon = createSvgElement("svg", {
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": 2,
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+  });
+
+  if (iconName === "eye-open") {
+    icon.append(
+      createSvgElement("path", { d: "M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" }),
+      createSvgElement("circle", { cx: 12, cy: 12, r: 3 }),
+    );
+    return icon;
+  }
+
+  if (iconName === "eye-closed") {
+    icon.append(
+      createSvgElement("path", { d: "M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" }),
+      createSvgElement("line", { x1: 1, y1: 1, x2: 23, y2: 23 }),
+    );
+    return icon;
+  }
+
+  if (iconName === "edit") {
+    icon.append(
+      createSvgElement("path", { d: "M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" }),
+      createSvgElement("path", { d: "M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" }),
+    );
+    return icon;
+  }
+
+  if (iconName === "delete") {
+    icon.append(
+      createSvgElement("polyline", { points: "3 6 5 6 21 6" }),
+      createSvgElement("path", { d: "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" }),
+      createSvgElement("line", { x1: 10, y1: 11, x2: 10, y2: 17 }),
+      createSvgElement("line", { x1: 14, y1: 11, x2: 14, y2: 17 }),
+    );
+    return icon;
+  }
+
+  return icon;
+}
+
 function isStandaloneMode() {
   return window.matchMedia("(display-mode: standalone)").matches
     || window.navigator.standalone === true;
@@ -163,13 +223,7 @@ function askPassword({ title, message, defaultValue = "" }) {
     elements.passwordDialogInput.value = defaultValue;
     elements.passwordDialogInput.type = "password";
 
-    // SVGs for eye icons
-    const eyeOpen =
-      '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
-    const eyeClosed =
-      '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>';
-
-    elements.togglePasswordDialogBtn.innerHTML = eyeOpen;
+    elements.togglePasswordDialogBtn.replaceChildren(createSvgIcon("eye-open", 20));
 
     const cleanup = () => {
       elements.passwordDialogForm.removeEventListener("submit", onSubmit);
@@ -197,9 +251,9 @@ function askPassword({ title, message, defaultValue = "" }) {
     const onToggle = () => {
       const isHidden = elements.passwordDialogInput.type === "password";
       elements.passwordDialogInput.type = isHidden ? "text" : "password";
-      elements.togglePasswordDialogBtn.innerHTML = isHidden
-        ? eyeClosed
-        : eyeOpen;
+      elements.togglePasswordDialogBtn.replaceChildren(
+        createSvgIcon(isHidden ? "eye-closed" : "eye-open", 20),
+      );
     };
 
     elements.passwordDialogForm.addEventListener("submit", onSubmit);
@@ -279,8 +333,7 @@ function createHistoryEditItem(history) {
   toggleBtn.type = "button";
   toggleBtn.className = "icon-btn";
   toggleBtn.title = "顯示/隱藏密碼";
-  toggleBtn.innerHTML =
-    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+  toggleBtn.replaceChildren(createSvgIcon("eye-open"));
   toggleBtn.addEventListener("click", () => {
     passwordInput.type =
       passwordInput.type === "password" ? "text" : "password";
@@ -295,8 +348,7 @@ function createHistoryEditItem(history) {
   deleteBtn.type = "button";
   deleteBtn.className = "icon-btn danger-btn";
   deleteBtn.title = "刪除";
-  deleteBtn.innerHTML =
-    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>';
+  deleteBtn.replaceChildren(createSvgIcon("delete"));
   deleteBtn.addEventListener("click", () => {
     wrapper.remove();
   });
@@ -346,7 +398,7 @@ function readRecordForm() {
 }
 
 function fillRecordMasterSelect(selectElement, items, selectedValue = "") {
-  selectElement.innerHTML = "";
+  selectElement.replaceChildren();
   const placeholderOption = document.createElement("option");
   placeholderOption.value = "";
   placeholderOption.textContent = "請選擇";
@@ -391,7 +443,7 @@ function syncTypeOptionsBySelectedCategory(selectedType = "") {
 
 function openRecordModal(record = null) {
   elements.recordForm.reset();
-  elements.passwordHistoryEditor.innerHTML = "";
+  elements.passwordHistoryEditor.replaceChildren();
   elements.recordId.value = "";
   refreshRecordFormMasterSelects(record);
 
@@ -428,7 +480,7 @@ function closeRecordModal() {
 
 function fillFilterSelect(selectElement, options, selectedValues) {
   const current = new Set(selectedValues);
-  selectElement.innerHTML = "";
+  selectElement.replaceChildren();
 
   const allOption = document.createElement("option");
   allOption.value = FILTER_ALL_VALUE;
@@ -529,7 +581,7 @@ function renderMasterTable(masterType, bodyElement) {
     : (selectedCategory
       ? PasswordRecordService.getTypesByCategory(state.data, selectedCategory.name)
       : []);
-  bodyElement.innerHTML = "";
+  bodyElement.replaceChildren();
 
   if (items.length === 0) {
     const row = document.createElement("tr");
@@ -569,8 +621,7 @@ function renderMasterTable(masterType, bodyElement) {
     editBtn.type = "button";
     editBtn.className = "icon-btn";
     editBtn.title = "修改";
-    editBtn.innerHTML =
-      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>';
+    editBtn.replaceChildren(createSvgIcon("edit"));
     editBtn.addEventListener("click", async (event) => {
       event.stopPropagation();
 
@@ -602,8 +653,7 @@ function renderMasterTable(masterType, bodyElement) {
     deleteBtn.type = "button";
     deleteBtn.className = "icon-btn danger-btn";
     deleteBtn.title = "刪除";
-    deleteBtn.innerHTML =
-      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>';
+    deleteBtn.replaceChildren(createSvgIcon("delete"));
     deleteBtn.addEventListener("click", (event) => {
       event.stopPropagation();
       if (!window.confirm("確定要刪除這筆主檔資料嗎？")) {
@@ -800,11 +850,99 @@ function clearAllAccountVisibility() {
   state.accountAutoHideTimers.clear();
 }
 
+function getArchivePasswordWeakReason(password) {
+  const normalized = String(password || "");
+
+  if (normalized.length < MIN_ARCHIVE_PASSWORD_LENGTH) {
+    return `密碼長度至少需 ${MIN_ARCHIVE_PASSWORD_LENGTH} 碼`;
+  }
+
+  const hasLowercase = /[a-z]/.test(normalized);
+  const hasUppercase = /[A-Z]/.test(normalized);
+  const hasNumber = /\d/.test(normalized);
+  const hasSymbol = /[^A-Za-z0-9]/.test(normalized);
+  const complexityCount = [hasLowercase, hasUppercase, hasNumber, hasSymbol].filter(Boolean).length;
+
+  if (complexityCount < 3) {
+    return "需包含英文大寫、英文小寫、數字、符號中至少 3 種";
+  }
+
+  if (/(.)\1{3,}/.test(normalized)) {
+    return "不可有連續重複字元 4 次以上";
+  }
+
+  if (/(1234|abcd|qwer|password|letmein)/i.test(normalized)) {
+    return "不可包含常見弱密碼片段";
+  }
+
+  return "";
+}
+
+function applySensitiveAutoLock(reason = "background") {
+  clearAllVisibility();
+  clearAllAccountVisibility();
+
+  document
+    .querySelectorAll(".history-password-input")
+    .forEach((input) => {
+      input.type = "password";
+    });
+
+  if (elements.passwordDialogInput) {
+    elements.passwordDialogInput.type = "password";
+    elements.passwordDialogInput.value = "";
+  }
+
+  if (reason === "idle") {
+    setMessage("已自動鎖定敏感顯示（閒置 5 分鐘）");
+  }
+}
+
+function scheduleSensitiveAutoLock() {
+  if (autoLockTimerId) {
+    clearTimeout(autoLockTimerId);
+  }
+
+  autoLockTimerId = setTimeout(() => {
+    applySensitiveAutoLock("idle");
+  }, AUTO_LOCK_TIMEOUT_MS);
+}
+
+function setupSensitiveAutoLock() {
+  const activityEvents = ["pointerdown", "keydown", "mousemove", "touchstart", "scroll"];
+
+  const onActivity = () => {
+    scheduleSensitiveAutoLock();
+  };
+
+  activityEvents.forEach((eventName) => {
+    window.addEventListener(eventName, onActivity, { passive: true });
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      applySensitiveAutoLock("background");
+      return;
+    }
+    scheduleSensitiveAutoLock();
+  });
+
+  window.addEventListener("blur", () => {
+    applySensitiveAutoLock("background");
+  });
+
+  window.addEventListener("focus", () => {
+    scheduleSensitiveAutoLock();
+  });
+
+  scheduleSensitiveAutoLock();
+}
+
 function renderRecords() {
   const records = sortRecordsByTableHeader(
     PasswordRecordService.queryRecords(state.data, state.filters),
   );
-  elements.recordTableBody.innerHTML = "";
+  elements.recordTableBody.replaceChildren();
 
   if (records.length === 0) {
     const row = document.createElement("tr");
@@ -819,14 +957,9 @@ function renderRecords() {
 
   records.forEach((record) => {
     const row = document.createElement("tr");
-    row.innerHTML = `
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-    `;
+    for (let index = 0; index < 6; index += 1) {
+      row.appendChild(document.createElement("td"));
+    }
 
     const categoryBadge = document.createElement("span");
     categoryBadge.className = "badge";
@@ -865,9 +998,7 @@ function renderRecords() {
       toggleBtn.type = "button";
       toggleBtn.className = "icon-btn";
       toggleBtn.title = visible ? "隱藏密碼" : "顯示密碼";
-      toggleBtn.innerHTML = visible
-        ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>'
-        : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+      toggleBtn.replaceChildren(createSvgIcon(visible ? "eye-closed" : "eye-open"));
       toggleBtn.addEventListener("click", () =>
         togglePasswordVisibility(record.id, history.id),
       );
@@ -886,16 +1017,14 @@ function renderRecords() {
     editBtn.type = "button";
     editBtn.className = "icon-btn";
     editBtn.title = "編輯";
-    editBtn.innerHTML =
-      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>';
+    editBtn.replaceChildren(createSvgIcon("edit"));
     editBtn.addEventListener("click", () => openRecordModal(record));
 
     const deleteBtn = document.createElement("button");
     deleteBtn.type = "button";
     deleteBtn.className = "icon-btn danger-btn";
     deleteBtn.title = "刪除";
-    deleteBtn.innerHTML =
-      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>';
+    deleteBtn.replaceChildren(createSvgIcon("delete"));
     deleteBtn.addEventListener("click", () => {
       if (!window.confirm("確定要刪除這筆資料嗎？")) {
         return;
@@ -1036,7 +1165,7 @@ async function handleExportClick() {
   try {
     const inputPassword = await askPassword({
       title: "存檔",
-      message: "請輸入存檔密碼",
+      message: "請輸入存檔密碼（至少 12 碼，且至少含 3 種字元類型）",
       defaultValue: "",
     });
     if (inputPassword === null) {
@@ -1046,6 +1175,12 @@ async function handleExportClick() {
     const archivePassword = String(inputPassword);
     if (!archivePassword) {
       setMessage("存檔密碼不可空白", "error");
+      return;
+    }
+
+    const weakReason = getArchivePasswordWeakReason(archivePassword);
+    if (weakReason) {
+      setMessage(`存檔密碼強度不足：${weakReason}`, "error");
       return;
     }
 
@@ -1156,7 +1291,7 @@ function bindEvents() {
   elements.changeArchivePasswordBtn.addEventListener("click", async () => {
     const newPassword = await askPassword({
       title: "變更存檔密碼",
-      message: "請輸入新的存檔密碼（將立即重新加密存檔）",
+      message: "請輸入新的存檔密碼（至少 12 碼，且至少含 3 種字元類型）",
       defaultValue: "",
     });
     if (newPassword === null) {
@@ -1166,6 +1301,12 @@ function bindEvents() {
     const archivePassword = String(newPassword);
     if (!archivePassword) {
       setMessage("存檔密碼不可空白", "error");
+      return;
+    }
+
+    const weakReason = getArchivePasswordWeakReason(archivePassword);
+    if (weakReason) {
+      setMessage(`存檔密碼強度不足：${weakReason}`, "error");
       return;
     }
 
@@ -1320,6 +1461,7 @@ async function registerServiceWorker() {
 function init() {
   updateTableSortHeaderUI();
   bindEvents();
+  setupSensitiveAutoLock();
   setupPwaInstallExperience();
   updateFilterOptions();
   renderMasterMaintenance();
