@@ -1,9 +1,14 @@
-const CACHE_NAME = 'password-manage-cache-v2';
+const CACHE_NAME = 'password-manage-cache-v3';
 const APP_SHELL = [
   './',
   './index.html',
-  './styles.css',
+  './styles.css?v=2026022504',
   './manifest.json',
+  './favicon.ico',
+  './images/192.png',
+  './images/512.png',
+  './images/192.ico',
+  './images/512.ico',
   './src/main.js',
   './src/utils.js',
   './src/services/EncryptionService.js',
