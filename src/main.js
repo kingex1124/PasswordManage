@@ -17,6 +17,7 @@ const state = {
     types: [],
     keyword: "",
   },
+  activeEncryptedPayload: null,
   selectedCategoryIdForTypeMaintenance: null,
   importedFileHandle: null,
   visibility: new Set(),
@@ -1197,6 +1198,7 @@ async function handleImport(encryptedText, fileHandle = null) {
       inputPassword,
     );
     state.data = PasswordRecordService.normalizeImportedPlainData(plainData);
+    state.activeEncryptedPayload = encryptedPayload;
     state.importedFileHandle = fileHandle;
     importService.clearCooldown();
     clearAllVisibility();
@@ -1241,6 +1243,7 @@ async function handleImport(encryptedText, fileHandle = null) {
         );
         state.importedFileHandle = saveResult.fileHandle || fileHandle || null;
         state.data = normalizedData;
+        state.activeEncryptedPayload = upgradedPayload;
         importService.clearCooldown();
         clearAllVisibility();
         clearAllAccountVisibility();
@@ -1293,36 +1296,51 @@ async function handleImportClick() {
 }
 
 async function handleExportClick() {
+  if (!state.activeEncryptedPayload) {
+    setMessage("目前沒有可驗證的加密檔，請先匯入檔案或按『變更存檔密碼』建立", "error");
+    return;
+  }
+
+  const inputPassword = await askPassword({
+    title: "存檔",
+    message: "請輸入目前存檔密碼進行驗證",
+    defaultValue: "",
+  });
+  if (inputPassword === null) {
+    return;
+  }
+
+  let verifiedPassword = String(inputPassword);
+  if (!verifiedPassword) {
+    setMessage("存檔密碼不可空白", "error");
+    return;
+  }
+
   try {
-    const inputPassword = await askPassword({
-      title: "存檔",
-      message: "請輸入存檔密碼（至少 12 碼，且至少含 3 種字元類型）",
-      defaultValue: "",
-    });
-    if (inputPassword === null) {
-      return;
-    }
+    await encryptionService.decryptFilePayload(
+      state.activeEncryptedPayload,
+      verifiedPassword,
+    );
+  } catch {
+    verifiedPassword = "";
+    setMessage("存檔失敗：密碼驗證失敗", "error");
+    return;
+  }
 
-    const archivePassword = String(inputPassword);
-    if (!archivePassword) {
-      setMessage("存檔密碼不可空白", "error");
-      return;
-    }
+  const shouldOverwrite = state.importedFileHandle
+    ? window.confirm("是否覆蓋原檔？按「取消」將改為另存新檔")
+    : false;
 
-    const weakReason = getArchivePasswordWeakReason(archivePassword);
-    if (weakReason) {
-      setMessage(`存檔密碼強度不足：${weakReason}`, "error");
-      return;
-    }
-
+  try {
     const encryptedPayload = await encryptionService.encryptRecords(
       state.data,
-      archivePassword,
+      verifiedPassword,
     );
     const saveResult = await FileService.saveEncryptedPayload(
       encryptedPayload,
-      state.importedFileHandle,
+      shouldOverwrite ? state.importedFileHandle : null,
     );
+    state.activeEncryptedPayload = encryptedPayload;
     state.importedFileHandle =
       saveResult.fileHandle || state.importedFileHandle;
 
@@ -1336,7 +1354,9 @@ async function handleExportClick() {
         "success",
       );
     }
+    verifiedPassword = "";
   } catch {
+    verifiedPassword = "";
     setMessage("匯出失敗：請稍後再試", "error");
   }
 }
@@ -1450,6 +1470,7 @@ function bindEvents() {
         encryptedPayload,
         state.importedFileHandle,
       );
+      state.activeEncryptedPayload = encryptedPayload;
       state.importedFileHandle =
         saveResult.fileHandle || state.importedFileHandle;
 
