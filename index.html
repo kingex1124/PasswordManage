@@ -9,7 +9,7 @@
     <link rel="icon" type="image/x-icon" href="./favicon.ico" />
     <link rel="icon" type="image/png" sizes="192x192" href="./images/192.png" />
     <link rel="apple-touch-icon" href="./images/192.png" />
-    <link rel="stylesheet" href="./styles.css?v=2026022509" />
+    <link rel="stylesheet" href="./styles.css?v=2026022510" />
   </head>
   <body>
     <div class="app-container">
@@ -348,6 +348,28 @@
       </form>
     </dialog>
 
-    <script type="module" src="./src/main.js?v=2026022509"></script>
+    <dialog id="masterEditDialog">
+      <form id="masterEditForm" method="dialog">
+        <div class="modal-header">
+          <h2 id="masterEditTitle">編輯主檔</h2>
+        </div>
+        <div class="modal-body">
+          <label>
+            名稱
+            <input id="masterEditNameInput" type="text" required />
+          </label>
+          <label>
+            流水號
+            <input id="masterEditSeqInput" type="number" min="1" step="1" required />
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button id="cancelMasterEditBtn" type="button">取消</button>
+          <button id="confirmMasterEditBtn" type="submit">儲存</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script type="module" src="./src/main.js?v=2026022510"></script>
   </body>
 </html>

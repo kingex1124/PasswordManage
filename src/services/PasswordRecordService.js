@@ -290,6 +290,19 @@ export class PasswordRecordService {
           : targetList[existingIndex].seq))
       : (Number.isFinite(seqInput) && seqInput > 0 ? seqInput : PasswordRecordService.getNextMasterSeq(targetList, categoryId));
 
+    const duplicatedSeq = targetList.find((item) => {
+      if (item.id === input.id || Number(item.seq) !== resolvedSeq) {
+        return false;
+      }
+      if (masterType === 'type') {
+        return item.categoryId === categoryId;
+      }
+      return true;
+    });
+    if (duplicatedSeq) {
+      throw new Error('MASTER_SEQ_DUPLICATED');
+    }
+
     const normalizedItem = {
       id: input?.id || generateId(),
       name,

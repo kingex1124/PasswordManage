@@ -72,6 +72,12 @@ const elements = {
   passwordDialogInput: document.querySelector("#passwordDialogInput"),
   togglePasswordDialogBtn: document.querySelector("#togglePasswordDialogBtn"),
   cancelPasswordDialogBtn: document.querySelector("#cancelPasswordDialogBtn"),
+  masterEditDialog: document.querySelector("#masterEditDialog"),
+  masterEditForm: document.querySelector("#masterEditForm"),
+  masterEditTitle: document.querySelector("#masterEditTitle"),
+  masterEditNameInput: document.querySelector("#masterEditNameInput"),
+  masterEditSeqInput: document.querySelector("#masterEditSeqInput"),
+  cancelMasterEditBtn: document.querySelector("#cancelMasterEditBtn"),
 };
 
 function setMessage(message, messageType = "") {
@@ -448,6 +454,45 @@ function promptMasterInput(title, defaultName = "") {
   return { name };
 }
 
+function askMasterEditInput(title, defaultName = "", defaultSeq = 1) {
+  return new Promise((resolve) => {
+    elements.masterEditTitle.textContent = title;
+    elements.masterEditNameInput.value = defaultName;
+    elements.masterEditSeqInput.value = String(defaultSeq);
+
+    const cleanup = () => {
+      elements.masterEditForm.removeEventListener("submit", onSubmit);
+      elements.cancelMasterEditBtn.removeEventListener("click", onCancel);
+      elements.masterEditDialog.removeEventListener("cancel", onCancel);
+    };
+
+    const onSubmit = (event) => {
+      event.preventDefault();
+      const name = elements.masterEditNameInput.value;
+      const seq = Number(elements.masterEditSeqInput.value);
+      cleanup();
+      elements.masterEditDialog.close();
+      resolve({ name, seq });
+    };
+
+    const onCancel = () => {
+      cleanup();
+      if (elements.masterEditDialog.open) {
+        elements.masterEditDialog.close();
+      }
+      resolve(null);
+    };
+
+    elements.masterEditForm.addEventListener("submit", onSubmit);
+    elements.cancelMasterEditBtn.addEventListener("click", onCancel);
+    elements.masterEditDialog.addEventListener("cancel", onCancel);
+
+    elements.masterEditDialog.showModal();
+    elements.masterEditNameInput.focus();
+    elements.masterEditNameInput.select();
+  });
+}
+
 function getSelectedCategoryForTypeMaintenance() {
   const categories = PasswordRecordService.sortMasterItems(
     state.data.categories || [],
@@ -519,12 +564,12 @@ function renderMasterTable(masterType, bodyElement) {
     editBtn.title = "修改";
     editBtn.innerHTML =
       '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>';
-    editBtn.addEventListener("click", (event) => {
+    editBtn.addEventListener("click", async (event) => {
       event.stopPropagation();
 
       const result = masterType === "type"
-        ? promptMasterInput("修改種類", item.name)
-        : promptMasterInput("修改", item.name);
+        ? await askMasterEditInput("修改種類", item.name, item.seq)
+        : await askMasterEditInput("修改類別", item.name, item.seq);
 
       if (!result) {
         return;
@@ -534,6 +579,7 @@ function renderMasterTable(masterType, bodyElement) {
         PasswordRecordService.saveMasterItem(state.data, masterType, {
           id: item.id,
           name: result.name,
+          seq: result.seq,
           ...(masterType === "type" ? { categoryId: item.categoryId } : {}),
         });
         updateFilterOptions();
@@ -583,6 +629,10 @@ function handleMasterError(error) {
   }
   if (error.message === "MASTER_SEQ_INVALID") {
     setMessage("流水號需為正整數", "error");
+    return;
+  }
+  if (error.message === "MASTER_SEQ_DUPLICATED") {
+    setMessage("流水號不可重複", "error");
     return;
   }
   if (error.message === "MASTER_NAME_DUPLICATED") {

@@ -113,6 +113,35 @@ test('master items should support add edit delete and sequence sorting', () => {
   assert.equal(data.categories[0].name, '電子郵件');
   assert.equal(data.categories[0].seq, 1);
 
+  assert.throws(
+    () => PasswordRecordService.saveMasterItem(data, 'category', {
+      id: firstId,
+      name: '電子郵件',
+      seq: 2,
+    }),
+    /MASTER_SEQ_DUPLICATED/,
+  );
+
+  PasswordRecordService.saveMasterItem(data, 'type', {
+    name: 'Yahoo',
+    categoryId: firstId,
+    seq: 1,
+  });
+  PasswordRecordService.saveMasterItem(data, 'type', {
+    name: 'Gmail',
+    categoryId: firstId,
+    seq: 2,
+  });
+
+  assert.throws(
+    () => PasswordRecordService.saveMasterItem(data, 'type', {
+      name: 'Outlook',
+      categoryId: firstId,
+      seq: 2,
+    }),
+    /MASTER_SEQ_DUPLICATED/,
+  );
+
   PasswordRecordService.deleteMasterItem(data, 'category', data.categories[1].id);
   assert.equal(data.categories.length, 3);
   assert.equal(data.categories.some((item) => item.name === '購物'), false);
