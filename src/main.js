@@ -32,7 +32,6 @@ const state = {
 
 const FILTER_ALL_VALUE = "__ALL__";
 let deferredInstallPrompt = null;
-let currentArchivePassword = "";
 
 const encryptionService = new EncryptionService();
 const importService = new ImportService();
@@ -943,7 +942,6 @@ async function handleImport(encryptedText, fileHandle = null) {
     );
     state.data = PasswordRecordService.normalizeImportedPlainData(plainData);
     state.importedFileHandle = fileHandle;
-    currentArchivePassword = inputPassword;
     importService.clearCooldown();
     clearAllVisibility();
     clearAllAccountVisibility();
@@ -954,6 +952,53 @@ async function handleImport(encryptedText, fileHandle = null) {
   } catch (error) {
     if (error.message === "UNSUPPORTED_VERSION") {
       setMessage("匯入失敗：不支援的檔案版本", "error");
+      return;
+    }
+    if (error.message === "LEGACY_CIPHER_DISABLED") {
+      const shouldUpgrade = window.confirm(
+        "偵測到舊版 CBC 檔案。是否立即升級為新版加密格式並載入？",
+      );
+      if (!shouldUpgrade) {
+        setMessage("匯入已取消：舊版 CBC 格式未升級", "error");
+        return;
+      }
+
+      try {
+        const legacyPlainData = await encryptionService.decryptLegacyFilePayload(
+          encryptedPayload,
+          inputPassword,
+        );
+        const normalizedData =
+          PasswordRecordService.normalizeImportedPlainData(legacyPlainData);
+        const upgradedPayload = await encryptionService.encryptRecords(
+          normalizedData,
+          inputPassword,
+        );
+
+        const saveResult = await FileService.saveEncryptedPayload(
+          upgradedPayload,
+          fileHandle,
+        );
+        state.importedFileHandle = saveResult.fileHandle || fileHandle || null;
+        state.data = normalizedData;
+        importService.clearCooldown();
+        clearAllVisibility();
+        clearAllAccountVisibility();
+        updateFilterOptions();
+        renderMasterMaintenance();
+        renderRecords();
+
+        if (saveResult.mode === "overwrite") {
+          setMessage("舊版檔案升級成功，已轉為新版並覆蓋原檔", "success");
+        } else if (saveResult.mode === "saveAs") {
+          setMessage("舊版檔案升級成功，已轉為新版並另存新檔", "success");
+        } else {
+          setMessage("舊版檔案升級成功，已轉為新版並以下載方式匯出", "success");
+        }
+      } catch {
+        importService.registerFailureCooldown(5);
+        setMessage("舊版檔案升級失敗：密碼錯誤或檔案已損毀", "error");
+      }
       return;
     }
 
@@ -991,15 +1036,18 @@ async function handleExportClick() {
   try {
     const inputPassword = await askPassword({
       title: "存檔",
-      message: "請輸入存檔密碼（可留空為目前密碼）",
-      defaultValue: currentArchivePassword || "",
+      message: "請輸入存檔密碼",
+      defaultValue: "",
     });
     if (inputPassword === null) {
       return;
     }
 
-    const archivePassword = inputPassword || currentArchivePassword || "";
-    currentArchivePassword = archivePassword;
+    const archivePassword = String(inputPassword);
+    if (!archivePassword) {
+      setMessage("存檔密碼不可空白", "error");
+      return;
+    }
 
     const encryptedPayload = await encryptionService.encryptRecords(
       state.data,
@@ -1108,14 +1156,44 @@ function bindEvents() {
   elements.changeArchivePasswordBtn.addEventListener("click", async () => {
     const newPassword = await askPassword({
       title: "變更存檔密碼",
-      message: "請輸入新的存檔密碼",
-      defaultValue: currentArchivePassword || "",
+      message: "請輸入新的存檔密碼（將立即重新加密存檔）",
+      defaultValue: "",
     });
     if (newPassword === null) {
       return;
     }
-    currentArchivePassword = newPassword;
-    setMessage("已更新存檔密碼，將於下次匯出生效", "success");
+
+    const archivePassword = String(newPassword);
+    if (!archivePassword) {
+      setMessage("存檔密碼不可空白", "error");
+      return;
+    }
+
+    try {
+      const encryptedPayload = await encryptionService.encryptRecords(
+        state.data,
+        archivePassword,
+      );
+      const saveResult = await FileService.saveEncryptedPayload(
+        encryptedPayload,
+        state.importedFileHandle,
+      );
+      state.importedFileHandle =
+        saveResult.fileHandle || state.importedFileHandle;
+
+      if (saveResult.mode === "overwrite") {
+        setMessage("變更密碼成功，已重新加密並覆蓋原檔", "success");
+      } else if (saveResult.mode === "saveAs") {
+        setMessage("變更密碼成功，已重新加密另存新檔", "success");
+      } else {
+        setMessage(
+          "變更密碼成功，已重新加密並以下載方式匯出",
+          "success",
+        );
+      }
+    } catch {
+      setMessage("變更密碼失敗：請稍後再試", "error");
+    }
   });
 
   elements.addPasswordHistoryBtn.addEventListener("click", () =>

@@ -34,13 +34,15 @@ test('EncryptionService should encrypt and decrypt records', async () => {
   assert.equal(typeof encrypted.cipherText, 'string');
   assert.equal(typeof encrypted.salt, 'string');
   assert.equal(typeof encrypted.iv, 'string');
+  assert.equal(encrypted.formatVersion, '3.0.0');
   assert.equal(encrypted.algorithm.cipher, 'AES-256-GCM');
+  assert.equal(encrypted.algorithm.iterations, 600000);
 
   const decrypted = await service.decryptFilePayload(encrypted, 'archive-pass');
   assert.deepEqual(decrypted, plainData);
 });
 
-test('EncryptionService should decrypt legacy AES-CBC payload', async () => {
+test('EncryptionService should block legacy AES-CBC payload by default', async () => {
   const service = new EncryptionService();
   const plainData = {
     version: '1.1.0',
@@ -83,6 +85,55 @@ test('EncryptionService should decrypt legacy AES-CBC payload', async () => {
     createdAt: new Date().toISOString(),
   };
 
-  const decrypted = await service.decryptFilePayload(legacyPayload, 'archive-pass');
+  await assert.rejects(
+    () => service.decryptFilePayload(legacyPayload, 'archive-pass'),
+    /LEGACY_CIPHER_DISABLED/,
+  );
+});
+
+test('EncryptionService should decrypt legacy AES-CBC payload via isolated API', async () => {
+  const service = new EncryptionService();
+  const plainData = {
+    version: '1.1.0',
+    records: [
+      {
+        id: 'r-legacy',
+        category: '舊版',
+        type: '測試',
+        account: 'legacy-user',
+        passwordHistory: [{ id: 'h-legacy', password: 'legacy-pass', changedAt: '2024-02-24T03:00:00.000Z' }],
+        note: 'legacy',
+        createdAt: '2024-02-24T02:00:00.000Z',
+        updatedAt: '2024-02-24T03:00:00.000Z',
+      },
+    ],
+  };
+
+  const { base64Salt, bytesSalt } = CryptoInitializer.generateSalt(16);
+  const kdf = new Pbkdf2Strategy();
+  const derivedKey = await CryptoInitializer.deriveKeyFromPassword('archive-pass', bytesSalt, kdf, 100000, 32);
+
+  const aesContext = CryptoInitializer.getAesContextForEncryptByRandomIV();
+  aesContext.key = derivedKey;
+  const encrypted = await aesContext.encryptWithIVToBase64(JSON.stringify(plainData));
+
+  const legacyPayload = {
+    formatVersion: '1.1.0',
+    algorithm: {
+      kdf: 'PBKDF2',
+      iterations: 100000,
+      keyLengthBytes: 32,
+      cipher: 'AES-256-CBC',
+      ivEncoding: 'base64',
+      saltEncoding: 'base64',
+      cipherTextEncoding: 'base64',
+    },
+    salt: base64Salt,
+    iv: encrypted.iv,
+    cipherText: encrypted.cipherText,
+    createdAt: new Date().toISOString(),
+  };
+
+  const decrypted = await service.decryptLegacyFilePayload(legacyPayload, 'archive-pass');
   assert.deepEqual(decrypted, plainData);
 });

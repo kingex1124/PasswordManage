@@ -1,9 +1,10 @@
 import { CryptoInitializer, Pbkdf2Strategy } from '../../crypto-js-lib/src/index.js';
 import { base64ToBytes } from '../utils.js';
 
-const ITERATIONS = 100000;
+const LEGACY_ITERATIONS = 100000;
+const ITERATIONS = 600000;
 const KEY_LENGTH_BYTES = 32;
-const CURRENT_FORMAT_VERSION = '2.0.0';
+const CURRENT_FORMAT_VERSION = '3.0.0';
 const CIPHER_AES_256_GCM = 'AES-256-GCM';
 const CIPHER_AES_256_CBC = 'AES-256-CBC';
 
@@ -45,8 +46,9 @@ export class EncryptionService {
     };
   }
 
-  async decryptFilePayload(encryptedPayload, archivePassword) {
+  async decryptFilePayload(encryptedPayload, archivePassword, options = {}) {
     this.validateEncryptedPayload(encryptedPayload);
+    const allowLegacyCbc = options?.allowLegacyCbc === true;
 
     const bytesSalt = base64ToBytes(encryptedPayload.salt);
     const iterations = this.resolveIterations(encryptedPayload);
@@ -65,6 +67,9 @@ export class EncryptionService {
     if (cipherName === CIPHER_AES_256_GCM) {
       plainText = await this.decryptWithAesGcm(encryptedPayload, derivedKey);
     } else if (cipherName === CIPHER_AES_256_CBC) {
+      if (!allowLegacyCbc) {
+        throw new Error('LEGACY_CIPHER_DISABLED');
+      }
       plainText = await this.decryptWithAesCbc(encryptedPayload, derivedKey);
     } else {
       throw new Error('UNSUPPORTED_VERSION');
@@ -74,9 +79,19 @@ export class EncryptionService {
     return plainData;
   }
 
+  async decryptLegacyFilePayload(encryptedPayload, archivePassword) {
+    return this.decryptFilePayload(encryptedPayload, archivePassword, {
+      allowLegacyCbc: true,
+    });
+  }
+
   resolveIterations(encryptedPayload) {
     const candidate = Number(encryptedPayload?.algorithm?.iterations);
     if (!Number.isFinite(candidate) || candidate <= 0) {
+      const version = String(encryptedPayload?.formatVersion || encryptedPayload?.version || '');
+      if (version.startsWith('1.') || version.startsWith('2.')) {
+        return LEGACY_ITERATIONS;
+      }
       return ITERATIONS;
     }
     return Math.floor(candidate);
@@ -100,10 +115,13 @@ export class EncryptionService {
     }
 
     const version = String(encryptedPayload?.formatVersion || encryptedPayload?.version || '');
-    if (version.startsWith('2.')) {
+    if (version.startsWith('2.') || version.startsWith('3.')) {
       return CIPHER_AES_256_GCM;
     }
-    return CIPHER_AES_256_CBC;
+    if (version.startsWith('1.')) {
+      return CIPHER_AES_256_CBC;
+    }
+    return CIPHER_AES_256_GCM;
   }
 
   async encryptWithAesGcm(plainText, derivedKey) {

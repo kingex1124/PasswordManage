@@ -111,8 +111,8 @@
 
 ### FR-007 編輯存檔密碼
 - 匯入成功後，介面需提供「修改存檔密碼」欄位。
-- 變更後僅在下一次匯出時生效（以新密碼重新加密檔案）。
-- 允許於記憶體暫存存檔密碼至分頁關閉。
+- 變更後需立即觸發重新加密匯出（以新密碼重寫檔案或另存）。
+- 不可於記憶體、LocalStorage、SessionStorage 預填或長駐存檔密碼。
 - 可回寫原檔：若已取得原檔寫入權限，下一次存檔預設覆蓋原檔。
 
 ### FR-008 查詢與排序
@@ -158,6 +158,11 @@
 ### FR-012 向下相容
 - 新版系統需可匯入舊版匯出檔（向下相容）。
 - 若檔案版本欄位存在差異，需採版本轉換或相容解析策略。
+- 舊版 AES-CBC 檔案預設不得直接解密載入，需走「升級流程」：
+  1. 使用者確認升級
+  2. 以輸入密碼在隔離相容路徑解密舊檔
+  3. 立即改用新版參數重新加密並寫回（覆蓋原檔或另存）
+  4. 載入升級後資料
 
 ### FR-013 直接覆蓋原匯出檔
 - 使用者首次匯入檔案後，系統可保存該檔案控制代碼於記憶體（當前分頁生命週期）。
@@ -204,12 +209,12 @@
 ### 7.2 匯出加密檔案資料模型（落地 JSON）
 ```json
 {
-  "formatVersion": "1.1.0",
+  "formatVersion": "3.0.0",
   "algorithm": {
     "kdf": "PBKDF2",
-    "iterations": 100000,
+    "iterations": 600000,
     "keyLengthBytes": 32,
-    "cipher": "AES-256-CBC",
+    "cipher": "AES-256-GCM",
     "ivEncoding": "base64",
     "saltEncoding": "base64",
     "cipherTextEncoding": "base64"
@@ -228,25 +233,24 @@
 ### 8.1 匯出（加密）
 1. 使用者輸入 `archivePassword`。
 2. 呼叫 `CryptoInitializer.generateSalt(16)` 取得 `bytesSalt/base64Salt`。
-3. 呼叫 `CryptoInitializer.deriveKeyFromPassword(archivePassword, bytesSalt, new Pbkdf2Strategy(), 100000, 32)`。
-4. 呼叫 `CryptoInitializer.getAesContextForEncryptByRandomIV()` 建立 AES context。
-5. 將步驟 3 的 derived key 指派給 AES context 的 `key`。
-6. 對明文 JSON 字串呼叫 `encryptWithIVToBase64()` 取得 `cipherText` 與 `iv`。
-7. 組合加密檔案 JSON 並下載。
+3. 呼叫 `CryptoInitializer.deriveKeyFromPassword(archivePassword, bytesSalt, new Pbkdf2Strategy(), 600000, 32)`。
+4. 使用 AES-256-GCM 對明文 JSON 字串加密（12-byte random IV），取得 `cipherText` 與 `iv`。
+5. 組合加密檔案 JSON 並下載。
 
 ### 8.2 匯入（解密）
 1. 讀取加密 JSON 檔案。
 2. 驗證 `formatVersion/salt/iv/cipherText` 欄位存在。
 3. 將 `salt(base64)` 轉為 bytes。
-4. 使用輸入密碼執行相同 PBKDF2 參數派生 key。
-5. 呼叫 `CryptoInitializer.getAesContextForDecryptByRandomIV(iv)` 建立解密 context。
-6. 指派 derived key 後呼叫 `decryptFromBase64(cipherText)`。
-7. 成功則 parse 明文 JSON 並以「覆蓋全部」策略載入；失敗回報錯誤並鎖定重試 5 秒。
+4. 依檔案 `algorithm.iterations` 派生 key；若舊版欄位缺失則依版本採相容預設值。
+5. 若為 AES-256-GCM，直接解密並載入。
+6. 若為舊版 AES-256-CBC，預設禁止直接載入，需經使用者確認後走升級流程。
+7. 解密成功後以「覆蓋全部」策略載入；失敗回報錯誤並鎖定重試 5 秒。
 
 ### 8.3 安全規則
 - 不保存存檔密碼到 LocalStorage。
+- 不在 UI 預填存檔密碼。
+- 不於記憶體長駐存檔密碼（僅限當次操作使用）。
 - 明文 JSON 僅在記憶體短暫存在。
-- 匯入後允許將存檔密碼暫存於記憶體直到分頁關閉。
 - 解密錯誤訊息避免透露過多細節（不要顯示關鍵內部堆疊）。
 
 ## 9. UI/UX 規格
@@ -376,7 +380,7 @@
 ### AC-009 向下相容
 - Given 使用者匯入舊版匯出檔
 - When 檔案格式可識別
-- Then 系統可成功解析並載入資料
+- Then 系統可透過升級流程將舊檔轉為新版格式後成功載入資料
 
 ### AC-010 類別/種類主檔維護
 - Given 使用者進入主檔維護區
@@ -403,9 +407,10 @@
 
 ## 14. 版本相容策略
 1. 匯入時先讀取 `formatVersion`。
-2. 若為相同主版本（1.x），直接依相容解析器讀取。
-3. 若欄位缺漏但可推導，補預設值後載入。
-4. 若無法判讀版本，顯示 `匯入失敗：不支援的檔案版本`。
+2. 若為 `3.x`（AES-256-GCM），直接依新流程解密載入。
+3. 若為 `1.x/2.x` 且可識別為舊格式，走「舊檔升級」流程後載入。
+4. 若欄位缺漏但可推導，補預設值後再嘗試相容處理。
+5. 若無法判讀版本，顯示 `匯入失敗：不支援的檔案版本`。
 
 ## 15. 決策摘要（由 QA 回填確認）
 1. 匯入採覆蓋全部。
@@ -413,8 +418,8 @@
 3. 密碼歷程可刪除、不保留刪除紀錄。
 4. 存檔密碼不設複雜度與長度限制。
 5. 解密失敗需延遲 5 秒才能重試。
-6. 匯入後可於記憶體暫存存檔密碼到關閉分頁。
-7. PBKDF2 iterations 固定預設 100000。
+6. 存檔密碼不預填、不常駐記憶體，僅於當次操作使用。
+7. PBKDF2 iterations 新版預設 600000，舊版匯入保留相容參數。
 8. 密碼歷程日期可手動調整，預設為新增當下。
 9. 篩選需支援多選，且切換排序需保留篩選。
 10. 眼睛按鈕採逐筆切換，60 秒自動回遮。
@@ -422,6 +427,7 @@
 12. 匯出檔名採 `password-manage-YYYYMMDD-HHmmss.json`。
 13. 不新增多餘 metadata。
 14. 需支援向下相容舊版匯出檔。
+14-1. 舊版 AES-CBC 檔案以受控升級流程相容，不允許直接載入。
 15. 需具備 PWA 離線能力。
 16. 存檔時優先覆蓋原匯出檔；不支援時退回另存新檔。
 17. 類別/種類需可在頁面上獨立維護（新增/修改/刪除）。
