@@ -105,6 +105,23 @@ function isIosDevice() {
   return /iphone|ipad|ipod/.test(userAgent) || isTouchMac;
 }
 
+async function isLikelyInstalledOnDevice() {
+  if (isStandaloneMode()) {
+    return true;
+  }
+
+  if (typeof window.navigator.getInstalledRelatedApps !== "function") {
+    return false;
+  }
+
+  try {
+    const relatedApps = await window.navigator.getInstalledRelatedApps();
+    return Array.isArray(relatedApps) && relatedApps.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 function dismissInstallHint() {
   installHintDismissed = true;
   elements.pwaInstallHint.hidden = true;
@@ -121,8 +138,9 @@ function showInstallHint(title, text, showInstallButton) {
   elements.pwaInstallHint.hidden = false;
 }
 
-function setupPwaInstallExperience() {
-  if (isStandaloneMode()) {
+async function setupPwaInstallExperience() {
+  const isInstalled = await isLikelyInstalledOnDevice();
+  if (isInstalled) {
     elements.pwaInstallHint.hidden = true;
     return;
   }
@@ -131,12 +149,6 @@ function setupPwaInstallExperience() {
     showInstallHint(
       "安裝 App（iPhone/iPad）",
       "請點 Safari 分享按鈕，再選「加入主畫面」。",
-      false,
-    );
-  } else {
-    showInstallHint(
-      "安裝 App",
-      "可先從瀏覽器選單加入主畫面；若支援一鍵安裝，會顯示安裝按鈕。",
       false,
     );
   }
