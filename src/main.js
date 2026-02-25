@@ -364,11 +364,11 @@ function fillFilterSelect(selectElement, options, selectedValues) {
   });
 }
 
-function normalizeFilterSelection(selectedValues) {
-  if (selectedValues.includes(FILTER_ALL_VALUE)) {
+function normalizeSingleFilterSelection(selectedValue) {
+  if (!selectedValue || selectedValue === FILTER_ALL_VALUE) {
     return [];
   }
-  return selectedValues;
+  return [selectedValue];
 }
 
 function promptMasterInput(title, defaultName = "") {
@@ -892,10 +892,9 @@ function bindEvents() {
   });
 
   elements.categoryFilter.addEventListener("change", () => {
-    const selectedValues = Array.from(
-      elements.categoryFilter.selectedOptions,
-    ).map((item) => item.value);
-    state.filters.categories = normalizeFilterSelection(selectedValues);
+    state.filters.categories = normalizeSingleFilterSelection(
+      elements.categoryFilter.value,
+    );
     fillFilterSelect(
       elements.categoryFilter,
       PasswordRecordService.buildFilterOptions(state.data).categories,
@@ -905,10 +904,9 @@ function bindEvents() {
   });
 
   elements.typeFilter.addEventListener("change", () => {
-    const selectedValues = Array.from(elements.typeFilter.selectedOptions).map(
-      (item) => item.value,
+    state.filters.types = normalizeSingleFilterSelection(
+      elements.typeFilter.value,
     );
-    state.filters.types = normalizeFilterSelection(selectedValues);
     fillFilterSelect(
       elements.typeFilter,
       PasswordRecordService.buildFilterOptions(state.data).types,
