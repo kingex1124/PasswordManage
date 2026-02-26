@@ -34,6 +34,8 @@ const FILTER_ALL_VALUE = "__ALL__";
 let deferredInstallPrompt = null;
 const MIN_ARCHIVE_PASSWORD_LENGTH = 12;
 const AUTO_LOCK_TIMEOUT_MS = 5 * 60 * 1000;
+const ARCHIVE_PASSWORD_MAX_AGE_DAYS = 90;
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
 let autoLockTimerId = null;
 
 const encryptionService = new EncryptionService();
@@ -46,6 +48,7 @@ const elements = {
   importBtn: document.querySelector("#importBtn"),
   saveBtn: document.querySelector("#saveBtn"),
   changeArchivePasswordBtn: document.querySelector("#changeArchivePasswordBtn"),
+  archivePasswordAgeText: document.querySelector("#archivePasswordAgeText"),
   categoryFilter: document.querySelector("#categoryFilter"),
   typeFilter: document.querySelector("#typeFilter"),
   categorySortHeader: document.querySelector("#categorySortHeader"),
@@ -1006,6 +1009,85 @@ function getArchivePasswordWeakReason(password) {
   return "";
 }
 
+function normalizeIsoDate(value) {
+  if (!value) {
+    return null;
+  }
+  const normalized = new Date(value);
+  if (Number.isNaN(normalized.getTime())) {
+    return null;
+  }
+  return normalized.toISOString();
+}
+
+function ensureArchivePasswordCreatedAt(data, fallbackValue = null) {
+  const existing = normalizeIsoDate(data.archivePasswordCreatedAt);
+  if (existing) {
+    data.archivePasswordCreatedAt = existing;
+    return existing;
+  }
+
+  const fallback = normalizeIsoDate(fallbackValue) || nowIsoString();
+  data.archivePasswordCreatedAt = fallback;
+  return fallback;
+}
+
+function getArchivePasswordAgeInfo(data = state.data) {
+  const archivePasswordCreatedAt = normalizeIsoDate(data?.archivePasswordCreatedAt);
+  if (!archivePasswordCreatedAt) {
+    return null;
+  }
+
+  const ageMs = Date.now() - new Date(archivePasswordCreatedAt).getTime();
+  const safeAgeMs = Math.max(0, ageMs);
+  const ageDays = Math.floor(safeAgeMs / DAY_IN_MS);
+
+  return {
+    archivePasswordCreatedAt,
+    ageDays,
+    isExpired: ageDays > ARCHIVE_PASSWORD_MAX_AGE_DAYS,
+  };
+}
+
+function getArchivePasswordAgeWarningText(data = state.data) {
+  const ageInfo = getArchivePasswordAgeInfo(data);
+  if (!ageInfo || !ageInfo.isExpired) {
+    return "";
+  }
+
+  return `警語：存檔密碼已超過 ${ARCHIVE_PASSWORD_MAX_AGE_DAYS} 天未更換（建立於 ${formatDateTime(ageInfo.archivePasswordCreatedAt)}）`;
+}
+
+function buildSuccessMessageWithPasswordAgeWarning(message, data = state.data) {
+  const warningText = getArchivePasswordAgeWarningText(data);
+  if (!warningText) {
+    return {
+      text: message,
+      type: "success",
+    };
+  }
+
+  return {
+    text: `${message}；${warningText}`,
+    type: "warning",
+  };
+}
+
+function renderArchivePasswordAge() {
+  if (!elements.archivePasswordAgeText) {
+    return;
+  }
+
+  const ageInfo = getArchivePasswordAgeInfo(state.data);
+  if (!ageInfo) {
+    elements.archivePasswordAgeText.textContent = "尚未建立存檔密碼";
+    return;
+  }
+
+  const warningSuffix = ageInfo.isExpired ? "（請盡快更換）" : "";
+  elements.archivePasswordAgeText.textContent = `密碼修改後第 ${ageInfo.ageDays} 天${warningSuffix}`;
+}
+
 function applySensitiveAutoLock(reason = "background") {
   clearAllVisibility();
   clearAllAccountVisibility();
@@ -1197,7 +1279,9 @@ async function handleImport(encryptedText, fileHandle = null) {
       encryptedPayload,
       inputPassword,
     );
-    state.data = PasswordRecordService.normalizeImportedPlainData(plainData);
+    const normalizedData = PasswordRecordService.normalizeImportedPlainData(plainData);
+    ensureArchivePasswordCreatedAt(normalizedData, encryptedPayload?.createdAt);
+    state.data = normalizedData;
     state.activeEncryptedPayload = encryptedPayload;
     state.importedFileHandle = fileHandle;
     importService.clearCooldown();
@@ -1206,7 +1290,9 @@ async function handleImport(encryptedText, fileHandle = null) {
     updateFilterOptions();
     renderMasterMaintenance();
     renderRecords();
-    setMessage("匯入成功，已覆蓋目前資料", "success");
+    renderArchivePasswordAge();
+    const importMessage = buildSuccessMessageWithPasswordAgeWarning("匯入成功，已覆蓋目前資料");
+    setMessage(importMessage.text, importMessage.type);
   } catch (error) {
     if (error.message === "UNSUPPORTED_VERSION") {
       setMessage("匯入失敗：不支援的檔案版本", "error");
@@ -1232,6 +1318,7 @@ async function handleImport(encryptedText, fileHandle = null) {
         );
         const normalizedData =
           PasswordRecordService.normalizeImportedPlainData(legacyPlainData);
+        ensureArchivePasswordCreatedAt(normalizedData, encryptedPayload?.createdAt);
         const upgradedPayload = await encryptionService.encryptRecords(
           normalizedData,
           inputPassword,
@@ -1250,13 +1337,29 @@ async function handleImport(encryptedText, fileHandle = null) {
         updateFilterOptions();
         renderMasterMaintenance();
         renderRecords();
-
+        renderArchivePasswordAge();
+        const warningMessage = getArchivePasswordAgeWarningText(normalizedData);
         if (saveResult.mode === "overwrite") {
-          setMessage("舊版檔案升級成功，已轉為新版並覆蓋原檔", "success");
+          setMessage(
+            warningMessage
+              ? `舊版檔案升級成功，已轉為新版並覆蓋原檔；${warningMessage}`
+              : "舊版檔案升級成功，已轉為新版並覆蓋原檔",
+            warningMessage ? "warning" : "success",
+          );
         } else if (saveResult.mode === "saveAs") {
-          setMessage("舊版檔案升級成功，已轉為新版並另存新檔", "success");
+          setMessage(
+            warningMessage
+              ? `舊版檔案升級成功，已轉為新版並另存新檔；${warningMessage}`
+              : "舊版檔案升級成功，已轉為新版並另存新檔",
+            warningMessage ? "warning" : "success",
+          );
         } else {
-          setMessage("舊版檔案升級成功，已轉為新版並以下載方式匯出", "success");
+          setMessage(
+            warningMessage
+              ? `舊版檔案升級成功，已轉為新版並以下載方式匯出；${warningMessage}`
+              : "舊版檔案升級成功，已轉為新版並以下載方式匯出",
+            warningMessage ? "warning" : "success",
+          );
         }
       } catch {
         importService.registerFailureCooldown(5);
@@ -1297,7 +1400,55 @@ async function handleImportClick() {
 
 async function handleExportClick() {
   if (!state.activeEncryptedPayload) {
-    setMessage("目前沒有可驗證的加密檔，請先匯入檔案或按『變更存檔密碼』建立", "error");
+    const firstPassword = await askPassword({
+      title: "首次存檔",
+      message: "請設定第一次存檔密碼（至少 12 碼，且至少含 3 種字元類型）",
+      defaultValue: "",
+    });
+    if (firstPassword === null) {
+      return;
+    }
+
+    const archivePassword = String(firstPassword);
+    if (!archivePassword) {
+      setMessage("存檔密碼不可空白", "error");
+      return;
+    }
+
+    const weakReason = getArchivePasswordWeakReason(archivePassword);
+    if (weakReason) {
+      setMessage(`存檔密碼強度不足：${weakReason}`, "error");
+      return;
+    }
+
+    const previousCreatedAt = state.data.archivePasswordCreatedAt;
+    state.data.archivePasswordCreatedAt = nowIsoString();
+
+    try {
+      const encryptedPayload = await encryptionService.encryptRecords(
+        state.data,
+        archivePassword,
+      );
+      const saveResult = await FileService.saveEncryptedPayload(
+        encryptedPayload,
+        state.importedFileHandle,
+      );
+      state.activeEncryptedPayload = encryptedPayload;
+      state.importedFileHandle = saveResult.fileHandle || state.importedFileHandle;
+      renderArchivePasswordAge();
+
+      if (saveResult.mode === "overwrite") {
+        setMessage("首次存檔成功，已建立存檔密碼並覆蓋原檔", "success");
+      } else if (saveResult.mode === "saveAs") {
+        setMessage("首次存檔成功，已建立存檔密碼並另存新檔", "success");
+      } else {
+        setMessage("首次存檔成功，已建立存檔密碼並以下載方式匯出", "success");
+      }
+    } catch {
+      state.data.archivePasswordCreatedAt = previousCreatedAt || null;
+      renderArchivePasswordAge();
+      setMessage("首次存檔失敗：請稍後再試", "error");
+    }
     return;
   }
 
@@ -1327,6 +1478,9 @@ async function handleExportClick() {
     return;
   }
 
+  ensureArchivePasswordCreatedAt(state.data, state.activeEncryptedPayload?.createdAt);
+  renderArchivePasswordAge();
+
   const shouldOverwrite = state.importedFileHandle
     ? window.confirm("是否覆蓋原檔？按「取消」將改為另存新檔")
     : false;
@@ -1343,17 +1497,19 @@ async function handleExportClick() {
     state.activeEncryptedPayload = encryptedPayload;
     state.importedFileHandle =
       saveResult.fileHandle || state.importedFileHandle;
+    renderArchivePasswordAge();
 
+    let successText = "";
     if (saveResult.mode === "overwrite") {
-      setMessage("存檔成功，已覆蓋原檔", "success");
+      successText = "存檔成功，已覆蓋原檔";
     } else if (saveResult.mode === "saveAs") {
-      setMessage("存檔成功，已另存新檔", "success");
+      successText = "存檔成功，已另存新檔";
     } else {
-      setMessage(
-        "存檔成功，瀏覽器不支援原檔覆蓋，已改以下載方式匯出",
-        "success",
-      );
+      successText = "存檔成功，瀏覽器不支援原檔覆蓋，已改以下載方式匯出";
     }
+
+    const saveMessage = buildSuccessMessageWithPasswordAgeWarning(successText);
+    setMessage(saveMessage.text, saveMessage.type);
     verifiedPassword = "";
   } catch {
     verifiedPassword = "";
@@ -1461,6 +1617,9 @@ function bindEvents() {
       return;
     }
 
+    const previousCreatedAt = state.data.archivePasswordCreatedAt;
+    state.data.archivePasswordCreatedAt = nowIsoString();
+
     try {
       const encryptedPayload = await encryptionService.encryptRecords(
         state.data,
@@ -1473,18 +1632,21 @@ function bindEvents() {
       state.activeEncryptedPayload = encryptedPayload;
       state.importedFileHandle =
         saveResult.fileHandle || state.importedFileHandle;
+      renderArchivePasswordAge();
 
       if (saveResult.mode === "overwrite") {
-        setMessage("變更密碼成功，已重新加密並覆蓋原檔", "success");
+        setMessage("變更密碼成功，已更新密碼建立日期並覆蓋原檔", "success");
       } else if (saveResult.mode === "saveAs") {
-        setMessage("變更密碼成功，已重新加密另存新檔", "success");
+        setMessage("變更密碼成功，已更新密碼建立日期並另存新檔", "success");
       } else {
         setMessage(
-          "變更密碼成功，已重新加密並以下載方式匯出",
+          "變更密碼成功，已更新密碼建立日期並以下載方式匯出",
           "success",
         );
       }
     } catch {
+      state.data.archivePasswordCreatedAt = previousCreatedAt || null;
+      renderArchivePasswordAge();
       setMessage("變更密碼失敗：請稍後再試", "error");
     }
   });
@@ -1609,6 +1771,7 @@ function init() {
   bindEvents();
   setupSensitiveAutoLock();
   setupPwaInstallExperience();
+  renderArchivePasswordAge();
   updateFilterOptions();
   renderMasterMaintenance();
   renderRecords();

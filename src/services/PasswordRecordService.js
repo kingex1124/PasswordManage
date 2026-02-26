@@ -3,7 +3,8 @@ import { generateId, nowIsoString, sortByChangedAtDesc } from '../utils.js';
 export class PasswordRecordService {
   static createEmptyData() {
     return {
-      version: '1.1.0',
+      version: '1.2.0',
+      archivePasswordCreatedAt: null,
       categories: [],
       types: [],
       records: [],
@@ -63,7 +64,9 @@ export class PasswordRecordService {
     );
 
     return {
-      version: '1.1.0',
+      version: '1.2.0',
+      archivePasswordCreatedAt:
+        PasswordRecordService.normalizeDate(plainData?.archivePasswordCreatedAt) || null,
       categories: normalizedCategories,
       types: normalizedTypes,
       records,

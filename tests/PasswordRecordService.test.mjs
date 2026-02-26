@@ -189,3 +189,17 @@ test('master items should support add edit delete and sequence sorting', () => {
   assert.equal(data.categories.length, 3);
   assert.equal(data.categories.some((item) => item.name === '購物'), false);
 });
+
+test('data model should keep archive password created date', () => {
+  const emptyData = PasswordRecordService.createEmptyData();
+  assert.equal(emptyData.archivePasswordCreatedAt, null);
+
+  const normalized = PasswordRecordService.normalizeImportedPlainData({
+    archivePasswordCreatedAt: '2025-01-01T00:00:00.000Z',
+    categories: [],
+    types: [],
+    records: [],
+  });
+
+  assert.equal(normalized.archivePasswordCreatedAt, '2025-01-01T00:00:00.000Z');
+});
