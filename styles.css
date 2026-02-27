@@ -540,14 +540,20 @@ tbody tr:hover {
 
 /* Messages */
 .message {
-  position: relative;
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 1000;
+  min-width: 300px;
+  max-width: 400px;
   padding: 1rem 1.25rem;
   border-radius: var(--radius-md);
-  margin-bottom: 1.5rem;
   font-size: 0.95rem;
   font-weight: 500;
   display: none;
+  box-shadow: var(--shadow-lg);
   animation: slideIn 0.3s ease-out;
+  cursor: pointer;
 }
 
 .message.is-visible {
@@ -567,15 +573,25 @@ tbody tr:hover {
   height: 1.75rem;
   padding: 0;
   border-radius: 9999px;
-  border: 1px solid var(--border);
+  border: 1px solid currentColor;
   background-color: transparent;
   color: inherit;
   font-size: 1rem;
   line-height: 1;
+  opacity: 0.7;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.message-close-btn:hover {
+  opacity: 1;
+  background-color: rgba(0,0,0,0.05);
 }
 
 @keyframes slideIn {
-  from { opacity: 0; transform: translateY(-0.5rem); }
+  from { opacity: 0; transform: translateY(1rem); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -900,5 +916,17 @@ select[multiple] {
 .master-block .table-container {
   max-height: 300px; /* Add max-height to prevent endless scrolling if list is long */
   overflow-y: auto;
+}
+
+/* Mobile Message */
+@media (max-width: 640px) {
+  .message {
+    left: 1rem;
+    right: 1rem;
+    bottom: 1rem;
+    min-width: unset;
+    max-width: none;
+    width: auto;
+  }
 }
 

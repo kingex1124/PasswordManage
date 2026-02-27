@@ -92,11 +92,23 @@ const elements = {
   cancelMasterEditBtn: document.querySelector("#cancelMasterEditBtn"),
 };
 
+let messageTimeout = null;
+
 function setMessage(message, messageType = "") {
+  if (messageTimeout) {
+    clearTimeout(messageTimeout);
+    messageTimeout = null;
+  }
+
   elements.messageText.textContent = message;
   elements.messageArea.className = `message ${messageType}`.trim();
+  
   if (message) {
     elements.messageArea.classList.add("is-visible");
+    // Auto-close after 10 seconds
+    messageTimeout = setTimeout(() => {
+      clearMessage();
+    }, 10000);
   } else {
     elements.messageArea.classList.remove("is-visible");
   }
@@ -105,6 +117,11 @@ function setMessage(message, messageType = "") {
 function clearMessage() {
   setMessage("");
 }
+
+// Click to dismiss functionality
+elements.messageArea.addEventListener("click", () => {
+  clearMessage();
+});
 
 function createSvgElement(tagName, attributes = {}) {
   const element = document.createElementNS("http://www.w3.org/2000/svg", tagName);
