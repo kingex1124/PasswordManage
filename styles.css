@@ -336,6 +336,7 @@ select[multiple] {
 
 #masterPanelBody {
   transition: all var(--transition-normal);
+  padding-bottom: 25px;
   /* overflow: hidden; causes issue with box-shadow sometimes but fine here */
 }
 
