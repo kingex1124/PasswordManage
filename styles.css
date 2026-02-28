@@ -832,8 +832,153 @@ dialog[open] {
     padding: 1.25rem;
   }
   
-  th, td {
-    padding: 0.75rem 1rem;
+  /* Table Responsive Card View - General */
+  .table-container table, 
+  .table-container thead, 
+  .table-container tbody, 
+  .table-container th, 
+  .table-container td, 
+  .table-container tr { 
+    display: block; 
+  }
+
+  .table-container thead { 
+    position: absolute;
+    top: -9999px;
+    left: -9999px;
+  }
+
+  .table-container tr { 
+    border: 1px solid var(--border);
+    margin-bottom: 1rem;
+    border-radius: var(--radius-md);
+    background-color: var(--bg-surface);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .table-container td { 
+    border: none;
+    border-bottom: 1px solid var(--border); 
+    position: relative;
+    padding-left: 50% !important; /* Increase padding to accommodate labels */
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+    text-align: right;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    min-height: 3rem;
+  }
+  
+  .table-container td::before { 
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%); /* Vertically center the label */
+    width: 45%; 
+    white-space: nowrap;
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    text-align: left;
+  }
+
+  .table-container td:last-child { 
+    border-bottom: 0;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+
+  /* Main Record Table Labels */
+  #recordTableBody td:nth-of-type(1)::before { content: "類別"; }
+  #recordTableBody td:nth-of-type(2)::before { content: "種類"; }
+  #recordTableBody td:nth-of-type(3)::before { content: "帳號"; }
+  #recordTableBody td:nth-of-type(4)::before { content: "密碼歷程"; }
+  #recordTableBody td:nth-of-type(5)::before { content: "備註"; }
+  #recordTableBody td:nth-of-type(6)::before { content: "操作"; }
+  
+  /* Special handling for Password History column in mobile view */
+  #recordTableBody td:nth-of-type(4) {
+    display: block;
+    width: 100%;
+    position: relative;
+    padding-left: 1rem !important;
+    padding-right: 1rem;
+    padding-top: 2.25rem; /* Make space for label */
+    padding-bottom: 1rem;
+    text-align: left;
+    height: auto;
+  }
+  
+  #recordTableBody td:nth-of-type(4)::before {
+    top: 0.75rem;
+    left: 1rem;
+    transform: none;
+    width: auto;
+    content: "密碼歷程"; /* Ensure content is set */
+    font-size: 0.75rem;
+    color: var(--primary); /* Highlight label slightly differently */
+  }
+  
+  #recordTableBody td:nth-of-type(4) .history-list {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.25rem; 
+  }
+  
+  #recordTableBody td:nth-of-type(4) .history-item {
+    justify-content: space-between;
+    width: 100%;
+    margin-bottom: 0;
+    display: flex;
+    align-items: center;
+    background-color: var(--bg-subtle);
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-md);
+  }
+
+  /* Ensure long passwords break correctly inside history item */
+  #recordTableBody td:nth-of-type(4) .history-item > span {
+    flex: 1;
+    min-width: 0; /* Allow flex item to shrink properly */
+    overflow-wrap: break-word;
+    word-break: break-all;
+    margin-right: 0.5rem;
+  }
+  
+  /* Special handling for Note column as well, often long text */
+  #recordTableBody td:nth-of-type(5) {
+    display: block;
+    width: 100%;
+    position: relative;
+    padding-left: 1rem !important;
+    padding-right: 1rem;
+    padding-top: 2.25rem;
+    padding-bottom: 1rem;
+    text-align: left;
+    height: auto;
+  }
+  
+  #recordTableBody td:nth-of-type(5)::before {
+    top: 0.75rem;
+    left: 1rem;
+    transform: none;
+    width: auto;
+    content: "備註";
+    font-size: 0.75rem;
+    color: var(--primary);
+  }
+
+  /* Master Panel Table Labels */
+  .master-block .table-container td:nth-of-type(1)::before { content: "流水號"; }
+  .master-block .table-container td:nth-of-type(2)::before { content: "名稱"; }
+  .master-block .table-container td:nth-of-type(3)::before { content: "操作"; }
+  
+  /* Make buttons in master table also align well */
+  .master-block .table-container td:nth-of-type(3) {
+      justify-content: flex-end;
   }
 }
 
