@@ -1789,7 +1789,10 @@ function bindEvents() {
 async function registerServiceWorker() {
   if ("serviceWorker" in navigator) {
     try {
-      await navigator.serviceWorker.register("./sw.js");
+      const registration = await navigator.serviceWorker.register("./sw.js", {
+        updateViaCache: "none",
+      });
+      await registration.update();
     } catch {
       setMessage("Service Worker 註冊失敗", "error");
     }
