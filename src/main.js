@@ -1166,6 +1166,9 @@ function setupSensitiveAutoLock() {
 }
 
 function renderRecords() {
+  // 保存滾動位置
+  const scrollPosition = window.scrollY;
+  
   const records = sortRecordsByTableHeader(
     PasswordRecordService.queryRecords(state.data, state.filters),
   );
@@ -1179,6 +1182,8 @@ function renderRecords() {
     cell.textContent = "目前沒有資料";
     row.appendChild(cell);
     elements.recordTableBody.appendChild(row);
+    // 恢復滾動位置
+    window.scrollTo(0, scrollPosition);
     return;
   }
 
@@ -1226,9 +1231,9 @@ function renderRecords() {
       toggleBtn.className = "icon-btn";
       toggleBtn.title = visible ? "隱藏密碼" : "顯示密碼";
       toggleBtn.replaceChildren(createSvgIcon(visible ? "eye-closed" : "eye-open"));
-      toggleBtn.addEventListener("click", () =>
-        togglePasswordVisibility(record.id, history.id),
-      );
+      toggleBtn.addEventListener("click", () => 
+        togglePasswordVisibility(record.id, history.id)
+    );
 
       historyItem.append(value, date, toggleBtn);
       historyContainer.appendChild(historyItem);
@@ -1270,6 +1275,9 @@ function renderRecords() {
     row.children[5].appendChild(actions);
     elements.recordTableBody.appendChild(row);
   });
+
+  // 恢復滾動位置
+  window.scrollTo(0, scrollPosition);
 }
 
 async function handleImport(encryptedText, fileHandle = null) {
