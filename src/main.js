@@ -1218,24 +1218,29 @@ function renderRecords() {
       const historyItem = document.createElement("div");
       historyItem.className = "history-item";
 
+      const topRow = document.createElement("div");
+      topRow.className = "history-item-top";
+
       const value = document.createElement("span");
       value.textContent = visible
         ? history.password
         : "•".repeat(Math.max(6, history.password.length || 6));
-
-      const date = document.createElement("time");
-      date.textContent = formatDateTime(history.changedAt);
 
       const toggleBtn = document.createElement("button");
       toggleBtn.type = "button";
       toggleBtn.className = "icon-btn";
       toggleBtn.title = visible ? "隱藏密碼" : "顯示密碼";
       toggleBtn.replaceChildren(createSvgIcon(visible ? "eye-closed" : "eye-open"));
-      toggleBtn.addEventListener("click", () => 
-        togglePasswordVisibility(record.id, history.id)
-    );
+      toggleBtn.addEventListener("click", () =>
+        togglePasswordVisibility(record.id, history.id),
+      );
 
-      historyItem.append(value, date, toggleBtn);
+      topRow.append(value, toggleBtn);
+
+      const date = document.createElement("time");
+      date.textContent = formatDateTime(history.changedAt);
+
+      historyItem.append(topRow, date);
       historyContainer.appendChild(historyItem);
     });
     row.children[3].appendChild(historyContainer);
