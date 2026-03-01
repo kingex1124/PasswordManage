@@ -448,6 +448,14 @@ select[multiple] {
   width: 100%;
 }
 
+.table-summary {
+  margin-top: 0.75rem;
+  text-align: left;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
 .master-block .table-container {
   border: none;
   box-shadow: none;

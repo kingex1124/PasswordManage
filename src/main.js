@@ -59,6 +59,7 @@ const elements = {
   messageCloseBtn: document.querySelector("#messageCloseBtn"),
   installAppBtn: document.querySelector("#installAppBtn"),
   recordTableBody: document.querySelector("#recordTableBody"),
+  recordCountText: document.querySelector("#recordCountText"),
   recordModal: document.querySelector("#recordModal"),
   recordModalTitle: document.querySelector("#recordModalTitle"),
   recordForm: document.querySelector("#recordForm"),
@@ -1168,10 +1169,20 @@ function setupSensitiveAutoLock() {
 function renderRecords() {
   // 保存滾動位置
   const scrollPosition = window.scrollY;
-  
+
   const records = sortRecordsByTableHeader(
     PasswordRecordService.queryRecords(state.data, state.filters),
   );
+  const hasActiveFilter = state.filters.categories.length > 0
+    || state.filters.types.length > 0
+    || Boolean(state.filters.keyword.trim());
+  const totalCount = (state.data.records || []).length;
+  if (elements.recordCountText) {
+    elements.recordCountText.textContent = hasActiveFilter
+      ? `篩選後筆數：${records.length}`
+      : `總筆數：${totalCount}`;
+  }
+
   elements.recordTableBody.replaceChildren();
 
   if (records.length === 0) {
