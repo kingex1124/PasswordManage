@@ -84,6 +84,7 @@ const elements = {
   passwordDialogMessage: document.querySelector("#passwordDialogMessage"),
   passwordDialogInput: document.querySelector("#passwordDialogInput"),
   togglePasswordDialogBtn: document.querySelector("#togglePasswordDialogBtn"),
+  copyPasswordDialogBtn: document.querySelector("#copyPasswordDialogBtn"),
   cancelPasswordDialogBtn: document.querySelector("#cancelPasswordDialogBtn"),
   masterEditDialog: document.querySelector("#masterEditDialog"),
   masterEditForm: document.querySelector("#masterEditForm"),
@@ -94,6 +95,7 @@ const elements = {
 };
 
 let messageTimeout = null;
+const copyButtonResetTimers = new WeakMap();
 
 function setMessage(message, messageType = "") {
   if (messageTimeout) {
@@ -160,6 +162,19 @@ function createSvgIcon(iconName, size = 16) {
     return icon;
   }
 
+  if (iconName === "copy") {
+    icon.append(
+      createSvgElement("rect", { x: 9, y: 9, width: 13, height: 13, rx: 2, ry: 2 }),
+      createSvgElement("path", { d: "M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" }),
+    );
+    return icon;
+  }
+
+  if (iconName === "check") {
+    icon.append(createSvgElement("polyline", { points: "20 6 9 17 4 12" }));
+    return icon;
+  }
+
   if (iconName === "edit") {
     icon.append(
       createSvgElement("path", { d: "M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" }),
@@ -179,6 +194,89 @@ function createSvgIcon(iconName, size = 16) {
   }
 
   return icon;
+}
+
+async function copyTextToClipboard(text) {
+  const normalizedText = String(text ?? "");
+
+  if (window.isSecureContext && navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(normalizedText);
+    return true;
+  }
+
+  const textArea = document.createElement("textarea");
+  textArea.value = normalizedText;
+  textArea.setAttribute("readonly", "");
+  textArea.style.position = "fixed";
+  textArea.style.opacity = "0";
+  textArea.style.pointerEvents = "none";
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+
+  let copied = false;
+  try {
+    copied = document.execCommand("copy");
+  } catch {
+    copied = false;
+  }
+
+  document.body.removeChild(textArea);
+  return copied;
+}
+
+function showCopySuccessState(button, iconSize = 16) {
+  if (!button) {
+    return;
+  }
+
+  const originalTitle = button.dataset.originalCopyTitle || button.title || "複製";
+  const originalAriaLabel = button.dataset.originalCopyAriaLabel
+    || button.getAttribute("aria-label")
+    || originalTitle;
+  button.dataset.originalCopyTitle = originalTitle;
+  button.dataset.originalCopyAriaLabel = originalAriaLabel;
+
+  const existingTimerId = copyButtonResetTimers.get(button);
+  if (existingTimerId) {
+    clearTimeout(existingTimerId);
+  }
+
+  button.replaceChildren(createSvgIcon("check", iconSize));
+  button.title = "已複製";
+  button.setAttribute("aria-label", "已複製");
+
+  const timerId = setTimeout(() => {
+    button.replaceChildren(createSvgIcon("copy", iconSize));
+    button.title = button.dataset.originalCopyTitle || "複製";
+    button.setAttribute(
+      "aria-label",
+      button.dataset.originalCopyAriaLabel || button.dataset.originalCopyTitle || "複製",
+    );
+    copyButtonResetTimers.delete(button);
+  }, 3000);
+
+  copyButtonResetTimers.set(button, timerId);
+}
+
+async function copyPasswordWithFeedback(password, copyButton = null, iconSize = 16) {
+  if (!password) {
+    setMessage("目前沒有可複製的密碼", "warning");
+    return false;
+  }
+
+  try {
+    const copied = await copyTextToClipboard(password);
+    if (copied) {
+      showCopySuccessState(copyButton, iconSize);
+      return true;
+    }
+  } catch {
+    // no-op: falls back to error feedback below
+  }
+
+  setMessage("複製失敗，請手動複製", "error");
+  return false;
 }
 
 function isStandaloneMode() {
@@ -249,6 +347,7 @@ function askPassword({ title, message, defaultValue = "" }) {
       elements.passwordDialogForm.removeEventListener("submit", onSubmit);
       elements.cancelPasswordDialogBtn.removeEventListener("click", onCancel);
       elements.togglePasswordDialogBtn.removeEventListener("click", onToggle);
+      elements.copyPasswordDialogBtn?.removeEventListener("click", onCopy);
       elements.passwordDialog.removeEventListener("cancel", onCancel);
     };
 
@@ -276,9 +375,18 @@ function askPassword({ title, message, defaultValue = "" }) {
       );
     };
 
+    const onCopy = () => {
+      void copyPasswordWithFeedback(
+        elements.passwordDialogInput.value,
+        elements.copyPasswordDialogBtn,
+        20,
+      );
+    };
+
     elements.passwordDialogForm.addEventListener("submit", onSubmit);
     elements.cancelPasswordDialogBtn.addEventListener("click", onCancel);
     elements.togglePasswordDialogBtn.addEventListener("click", onToggle);
+    elements.copyPasswordDialogBtn?.addEventListener("click", onCopy);
     elements.passwordDialog.addEventListener("cancel", onCancel);
 
     elements.passwordDialog.showModal();
@@ -364,6 +472,16 @@ function createHistoryEditItem(history) {
     }
   });
 
+  const copyBtn = document.createElement("button");
+  copyBtn.type = "button";
+  copyBtn.className = "icon-btn";
+  copyBtn.title = "複製密碼";
+  copyBtn.setAttribute("aria-label", "複製密碼");
+  copyBtn.replaceChildren(createSvgIcon("copy"));
+  copyBtn.addEventListener("click", () => {
+    void copyPasswordWithFeedback(passwordInput.value, copyBtn);
+  });
+
   const deleteBtn = document.createElement("button");
   deleteBtn.type = "button";
   deleteBtn.className = "icon-btn danger-btn";
@@ -375,7 +493,7 @@ function createHistoryEditItem(history) {
 
   const actionContainer = document.createElement("div");
   actionContainer.className = "action-buttons";
-  actionContainer.append(toggleBtn, deleteBtn);
+  actionContainer.append(toggleBtn, copyBtn, deleteBtn);
 
   wrapper.append(passwordInput, dateInput, actionContainer);
   return wrapper;
@@ -1237,6 +1355,19 @@ function renderRecords() {
         ? history.password
         : "•".repeat(Math.max(6, history.password.length || 6));
 
+      const topActions = document.createElement("div");
+      topActions.className = "history-item-actions";
+
+      const copyBtn = document.createElement("button");
+      copyBtn.type = "button";
+      copyBtn.className = "icon-btn";
+      copyBtn.title = "複製密碼";
+      copyBtn.setAttribute("aria-label", "複製密碼");
+      copyBtn.replaceChildren(createSvgIcon("copy"));
+      copyBtn.addEventListener("click", () => {
+        void copyPasswordWithFeedback(history.password, copyBtn);
+      });
+
       const toggleBtn = document.createElement("button");
       toggleBtn.type = "button";
       toggleBtn.className = "icon-btn";
@@ -1246,7 +1377,9 @@ function renderRecords() {
         togglePasswordVisibility(record.id, history.id),
       );
 
-      topRow.append(value, toggleBtn);
+      topActions.append(copyBtn, toggleBtn);
+
+      topRow.append(value, topActions);
 
       const date = document.createElement("time");
       date.textContent = formatDateTime(history.changedAt);

@@ -776,6 +776,12 @@ dialog[open] {
   white-space: nowrap;
 }
 
+.history-item-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
 .history-item time {
   font-size: 0.75rem;
   color: var(--text-muted);
